@@ -114,6 +114,12 @@ function languageFor(file, code, explicit) {
 
 function readInput(file) {
   if (file && file !== '-') return readFileSync(file, 'utf8');
+  // Bare `jsray` in an interactive terminal would block forever waiting for
+  // stdin EOF and look like "nothing happens" — show help instead.
+  if (process.stdin.isTTY && file !== '-') {
+    process.stdout.write(HELP);
+    process.exit(0);
+  }
   try {
     return readFileSync(0, 'utf8'); // stdin
   } catch {
