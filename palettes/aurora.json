@@ -1,0 +1,72 @@
+{
+  "name": "Aurora",
+  "author": "Eric Liu",
+  "description": "Polar-night palette · glacial blue surfaces, aurora mint and violet accents · dark + light",
+  "philosophy": "Cool spectrum identity. The six identifier families keep their cross-theme intuition: parameters stay warm-amber italic, runtime builtins cool blue, constants muted gold — only the surface temperature and accent hues shift toward the arctic.",
+  "themes": {
+    "dark": {
+      "background": "#0F1522",
+      "foreground": "#D9E3F0",
+      "border": "#1D2739",
+      "gutter": "#3D4A61",
+      "lineHighlight": "rgba(140,180,255,0.07)",
+      "tokens": {
+        "keyword":              { "color": "#B08CFF", "fontStyle": "bold" },
+        "function":             { "color": "#38C6B4" },
+        "function.declaration": { "color": "#55E6D0", "fontStyle": "bold" },
+        "function.builtin":     { "color": "#A8B8FF" },
+        "variable":             { "color": "#D9E3F0" },
+        "variable.parameter":   { "color": "#F5B971", "fontStyle": "italic" },
+        "variable.builtin":     { "color": "#6FB3FF", "fontStyle": "bold" },
+        "variable.constant":    { "color": "#D9C58A" },
+        "type":                 { "color": "#4FD2FF" },
+        "property":             { "color": "#FF9EB8" },
+        "string":               { "color": "#FF9E80" },
+        "string.regex":         { "color": "#FFD479" },
+        "number":               { "color": "#C3E88D" },
+        "comment":              { "color": "#5C6B84", "fontStyle": "italic" },
+        "comment.doc":          { "color": "#5C6B84", "fontStyle": "italic" },
+        "decorator":            { "color": "#E0B15E" },
+        "operator":             { "color": "#C7D3E3" },
+        "punctuation":          { "color": "#566178" },
+        "tag":                  { "color": "#B08CFF" },
+        "attribute":            { "color": "#FF9EB8" },
+        "selector":             { "color": "#38C6B4" },
+        "css.property":         { "color": "#FF9EB8" },
+        "css.unit":             { "color": "#C3E88D" }
+      }
+    },
+    "light": {
+      "background": "#F8FBFF",
+      "foreground": "#1E2A3E",
+      "border": "#DCE6F2",
+      "gutter": "#8C9AAE",
+      "lineHighlight": "rgba(30,90,180,0.05)",
+      "tokens": {
+        "keyword":              { "color": "#6C3FD6", "fontStyle": "bold" },
+        "function":             { "color": "#0F8C74" },
+        "function.declaration": { "color": "#00745E", "fontStyle": "bold" },
+        "function.builtin":     { "color": "#4C5FD5" },
+        "variable":             { "color": "#1E2A3E" },
+        "variable.parameter":   { "color": "#B26B00", "fontStyle": "italic" },
+        "variable.builtin":     { "color": "#0B69C7", "fontStyle": "bold" },
+        "variable.constant":    { "color": "#8A6B1E" },
+        "type":                 { "color": "#0080D6" },
+        "property":             { "color": "#C23A6B" },
+        "string":               { "color": "#D14D2E" },
+        "string.regex":         { "color": "#B2762E" },
+        "number":               { "color": "#557A00" },
+        "comment":              { "color": "#71809A", "fontStyle": "italic" },
+        "comment.doc":          { "color": "#71809A", "fontStyle": "italic" },
+        "decorator":            { "color": "#92701C" },
+        "operator":             { "color": "#3E4A5E" },
+        "punctuation":          { "color": "#9AA6B8" },
+        "tag":                  { "color": "#6C3FD6" },
+        "attribute":            { "color": "#C23A6B" },
+        "selector":             { "color": "#0F8C74" },
+        "css.property":         { "color": "#C23A6B" },
+        "css.unit":             { "color": "#557A00" }
+      }
+    }
+  }
+}

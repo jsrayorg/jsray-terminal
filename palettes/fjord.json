@@ -1,0 +1,72 @@
+{
+  "name": "Fjord",
+  "author": "Eric Liu",
+  "description": "Nordic low-chroma palette · blue-gray surfaces, moss strings, glacier accents · calm and professional · dark + light",
+  "philosophy": "Desaturated Scandinavian identity for long reading sessions. Every hue is pulled toward gray, but the six identifier families keep distinct hue anchors so semantics survive the reduced chroma.",
+  "themes": {
+    "dark": {
+      "background": "#232830",
+      "foreground": "#DCE2EC",
+      "border": "#323945",
+      "gutter": "#59616D",
+      "lineHighlight": "rgba(160,180,210,0.06)",
+      "tokens": {
+        "keyword":              { "color": "#7E9CC9", "fontStyle": "bold" },
+        "function":             { "color": "#88C0A8" },
+        "function.declaration": { "color": "#A3D9BE", "fontStyle": "bold" },
+        "function.builtin":     { "color": "#C9A0C7" },
+        "variable":             { "color": "#DCE2EC" },
+        "variable.parameter":   { "color": "#D9B47F", "fontStyle": "italic" },
+        "variable.builtin":     { "color": "#6FBFD9", "fontStyle": "bold" },
+        "variable.constant":    { "color": "#CBB88A" },
+        "type":                 { "color": "#79C7D4" },
+        "property":             { "color": "#D9A0A8" },
+        "string":               { "color": "#A8C98C" },
+        "string.regex":         { "color": "#D9C98A" },
+        "number":               { "color": "#D0A97E" },
+        "comment":              { "color": "#667084", "fontStyle": "italic" },
+        "comment.doc":          { "color": "#667084", "fontStyle": "italic" },
+        "decorator":            { "color": "#C98F6E" },
+        "operator":             { "color": "#C5CDD9" },
+        "punctuation":          { "color": "#59606E" },
+        "tag":                  { "color": "#7E9CC9" },
+        "attribute":            { "color": "#D9A0A8" },
+        "selector":             { "color": "#88C0A8" },
+        "css.property":         { "color": "#D9A0A8" },
+        "css.unit":             { "color": "#D0A97E" }
+      }
+    },
+    "light": {
+      "background": "#F4F6F8",
+      "foreground": "#333A47",
+      "border": "#DFE4EA",
+      "gutter": "#8C96A4",
+      "lineHighlight": "rgba(60,90,130,0.05)",
+      "tokens": {
+        "keyword":              { "color": "#3E5F8A", "fontStyle": "bold" },
+        "function":             { "color": "#2E7D5B" },
+        "function.declaration": { "color": "#1D6B4A", "fontStyle": "bold" },
+        "function.builtin":     { "color": "#8A5A96" },
+        "variable":             { "color": "#333A47" },
+        "variable.parameter":   { "color": "#9A6B1E", "fontStyle": "italic" },
+        "variable.builtin":     { "color": "#2578A8", "fontStyle": "bold" },
+        "variable.constant":    { "color": "#7A6528" },
+        "type":                 { "color": "#1E7A96" },
+        "property":             { "color": "#A85470" },
+        "string":               { "color": "#4E7A2E" },
+        "string.regex":         { "color": "#8A7222" },
+        "number":               { "color": "#8A5E2E" },
+        "comment":              { "color": "#7A8494", "fontStyle": "italic" },
+        "comment.doc":          { "color": "#7A8494", "fontStyle": "italic" },
+        "decorator":            { "color": "#A0653C" },
+        "operator":             { "color": "#454E5E" },
+        "punctuation":          { "color": "#9AA4B2" },
+        "tag":                  { "color": "#3E5F8A" },
+        "attribute":            { "color": "#A85470" },
+        "selector":             { "color": "#2E7D5B" },
+        "css.property":         { "color": "#A85470" },
+        "css.unit":             { "color": "#8A5E2E" }
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['18', '20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Validate version metadata
+        run: npm run check:versions
+      - name: Run tests
+        run: npm test
+      - name: CLI smoke
+        run: |
+          printf 'const x = 1;\n' | node bin/jsray.mjs --lang js --color truecolor | grep -q $'\x1b\[38;2;'
+          node bin/jsray.mjs --list-themes | grep -q aurora

@@ -1,0 +1,72 @@
+{
+  "name": "Ember",
+  "author": "Eric Liu",
+  "description": "Warm-forge palette · charcoal surfaces, flame keywords, patina-mint functions · dark + light",
+  "philosophy": "Warm spectrum identity, balanced by cool functional accents (fire + patina). Family intuitions preserved: parameters warm-amber italic, runtime builtins cool blue, constants muted gold; keywords burn crimson and strings glow peach.",
+  "themes": {
+    "dark": {
+      "background": "#1A1512",
+      "foreground": "#EDE3D9",
+      "border": "#2E2620",
+      "gutter": "#5C4F44",
+      "lineHighlight": "rgba(255,180,120,0.06)",
+      "tokens": {
+        "keyword":              { "color": "#F2545B", "fontStyle": "bold" },
+        "function":             { "color": "#4EC9A8" },
+        "function.declaration": { "color": "#6FE8C4", "fontStyle": "bold" },
+        "function.builtin":     { "color": "#DE9BE0" },
+        "variable":             { "color": "#EDE3D9" },
+        "variable.parameter":   { "color": "#FFC078", "fontStyle": "italic" },
+        "variable.builtin":     { "color": "#7AB8FF", "fontStyle": "bold" },
+        "variable.constant":    { "color": "#E0C285" },
+        "type":                 { "color": "#64C7E8" },
+        "property":             { "color": "#FF9EB0" },
+        "string":               { "color": "#FF9F7C" },
+        "string.regex":         { "color": "#FFD479" },
+        "number":               { "color": "#CBD96B" },
+        "comment":              { "color": "#857468", "fontStyle": "italic" },
+        "comment.doc":          { "color": "#857468", "fontStyle": "italic" },
+        "decorator":            { "color": "#E0A35E" },
+        "operator":             { "color": "#E0D5C8" },
+        "punctuation":          { "color": "#6E6258" },
+        "tag":                  { "color": "#F2545B" },
+        "attribute":            { "color": "#FF9EB0" },
+        "selector":             { "color": "#4EC9A8" },
+        "css.property":         { "color": "#FF9EB0" },
+        "css.unit":             { "color": "#CBD96B" }
+      }
+    },
+    "light": {
+      "background": "#FDF9F3",
+      "foreground": "#33241C",
+      "border": "#EDE2D2",
+      "gutter": "#A08C7C",
+      "lineHighlight": "rgba(180,90,20,0.05)",
+      "tokens": {
+        "keyword":              { "color": "#C1273C", "fontStyle": "bold" },
+        "function":             { "color": "#0E7D66" },
+        "function.declaration": { "color": "#00694F", "fontStyle": "bold" },
+        "function.builtin":     { "color": "#8746C9" },
+        "variable":             { "color": "#33241C" },
+        "variable.parameter":   { "color": "#A85E00", "fontStyle": "italic" },
+        "variable.builtin":     { "color": "#0E66A8", "fontStyle": "bold" },
+        "variable.constant":    { "color": "#86611A" },
+        "type":                 { "color": "#0B6E9E" },
+        "property":             { "color": "#B03A5E" },
+        "string":               { "color": "#C24A1E" },
+        "string.regex":         { "color": "#A66A14" },
+        "number":               { "color": "#5F6B00" },
+        "comment":              { "color": "#8A7A6E", "fontStyle": "italic" },
+        "comment.doc":          { "color": "#8A7A6E", "fontStyle": "italic" },
+        "decorator":            { "color": "#8A6A14" },
+        "operator":             { "color": "#4A3A30" },
+        "punctuation":          { "color": "#B0A296" },
+        "tag":                  { "color": "#C1273C" },
+        "attribute":            { "color": "#B03A5E" },
+        "selector":             { "color": "#0E7D66" },
+        "css.property":         { "color": "#B03A5E" },
+        "css.unit":             { "color": "#5F6B00" }
+      }
+    }
+  }
+}
