@@ -38,6 +38,13 @@ expect(existsSync('vendor/jsray.cjs'), 'vendor/jsray.cjs missing — run tools/s
 expect(existsSync('palettes/default.json'), 'palettes/default.json missing — run tools/sync-core.sh');
 
 // Opportunistic drift check against a sibling Core checkout.
+// Day-to-day drift is ADVISORY (integrations batch Core updates); it only
+// fails in strict mode: JSRAY_STRICT_DRIFT=1 or --strict (packaging/release).
+const strictDrift = process.env.JSRAY_STRICT_DRIFT === '1' || process.argv.includes('--strict');
+const warns = [];
+const expectDrift = (condition, message) => {
+  if (!condition) (strictDrift ? fail : warns).push(message);
+};
 const coreDir = process.env.JSRAY_CORE_DIR || '../jsray';
 if (existsSync(resolve(coreDir, 'dist'))) {
   const bundlePairs = [
@@ -51,15 +58,20 @@ if (existsSync(resolve(coreDir, 'dist'))) {
   }
   for (const [bundled, core] of bundlePairs) {
     if (!existsSync(bundled)) { fail.push(`missing ${bundled} — run 'sh tools/sync-core.sh'`); continue; }
-    expect(read(bundled) === read(core),
+    expectDrift(read(bundled) === read(core),
       `bundled ${bundled} differs from Core ${core} — run 'sh tools/sync-core.sh'`);
   }
   const coreVersionPath = resolve(coreDir, 'version.json');
   if (existsSync(coreVersionPath)) {
     const coreRelease = json(coreVersionPath);
-    expect(release.bundledCore.version === coreRelease.version,
+    expectDrift(release.bundledCore.version === coreRelease.version,
       `bundledCore.version ${release.bundledCore.version} != Core ${coreRelease.version} — run 'sh tools/sync-core.sh'`);
   }
+}
+
+if (warns.length) {
+  console.warn('Core drift (advisory — sync before this integration\'s next release):');
+  for (const message of warns) console.warn(`- ${message}`);
 }
 
 if (fail.length) {
