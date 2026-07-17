@@ -29,10 +29,16 @@
     let stream = [code];
     for (const rule of rules) {
       const next = [];
-      const flags = (rule.pattern.flags || '').replace('g', '') + 'g';
+      // Compile once per rule and cache on the rule object — the old code
+      // built a fresh RegExp per stream piece, which dominated tokenize time
+      // on fragmented streams. lastIndex is reset per piece instead.
+      const re = rule._re || (rule._re = new RegExp(
+        rule.pattern.source,
+        (rule.pattern.flags || '').replace('g', '') + 'g'
+      ));
       for (const piece of stream) {
         if (typeof piece !== 'string') { next.push(piece); continue; }
-        const re = new RegExp(rule.pattern.source, flags);
+        re.lastIndex = 0;
         let last = 0, m;
         while ((m = re.exec(piece)) !== null) {
           const lbLen = rule.lookbehind && m[1] ? m[1].length : 0;
@@ -117,9 +123,11 @@
   ];
 
   G.javascript = [
-    // Doc comments must come before plain block comments
+    // Doc comments must come before plain block comments. Block comments stay
+    // before strings; LINE comments come after strings (see below) so
+    // "https://..." inside a string never becomes a comment.
     { cls: 'tk-doc',     pattern: /\/\*\*[\s\S]*?\*\// },
-    { cls: 'tk-comment', pattern: /\/\*[\s\S]*?\*\/|\/\/.*/ },
+    { cls: 'tk-comment', pattern: /\/\*[\s\S]*?\*\// },
 
     // Parameter lists · function foo(...) / (...) => / async (...) =>
     { cls: 'tk-scope',
@@ -139,6 +147,7 @@
     ]},
     { cls: 'tk-string',  pattern: RX.string1 },
     { cls: 'tk-string',  pattern: RX.string2 },
+    { cls: 'tk-comment', pattern: /\/\/.*/ },
 
     // Regex: only recognize after =/(/,/!/keyword to avoid eating division
     // Capture prefix whitespace as lookbehind so it stays outside the regex token.
@@ -217,10 +226,11 @@
   ];
 
   G.python = [
-    // Triple-quoted strings (with f/r/b prefixes)
+    // Triple-quoted strings (with f/r/b prefixes). All strings before
+    // comments so # inside "..." never becomes a comment.
     { cls: 'tk-string',  pattern: /(?:[rRbBuUfF]{0,2})("""[\s\S]*?"""|'''[\s\S]*?''')/ },
-    { cls: 'tk-comment', pattern: /#.*/ },
     { cls: 'tk-string',  pattern: /(?:[rRbBuUfF]{0,2})("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')/ },
+    { cls: 'tk-comment', pattern: /#.*/ },
 
     // Parameter list · def foo(self, n: int = 0)
     { cls: 'tk-scope',
@@ -351,11 +361,12 @@
     'docker kubectl python python3 pip pip3 ruby go cargo make brew apt yum';
 
   G.shell = [
-    { cls: 'tk-comment', pattern: /#.*/ },
-    { cls: 'tk-string',  pattern: /"(?:\\.|\$[\w{][^"]*|[^"\\$])*"/, inside: [
+    // Strings before comments, else # inside "..." is eaten as a comment
+    { cls: 'tk-string',  pattern: /"(?:\\.|\$[\w{][^"\n]*|[^"\\$\n])*"/, inside: [
         { cls: 'tk-var-builtin', pattern: /\$\{[^}]+\}|\$\w+/ },
     ]},
-    { cls: 'tk-string',  pattern: /'[^']*'/ },
+    { cls: 'tk-string',  pattern: /'[^'\n]*'/ },
+    { cls: 'tk-comment', pattern: /#.*/ },
 
     { cls: 'tk-var-builtin', pattern: /\$\{[^}]+\}|\$\w+|\$[#?@*]/ },
 
@@ -395,12 +406,15 @@
   ).split(' ');
 
   G.php = [
-    { cls: 'tk-comment', pattern: /\/\*[\s\S]*?\*\/|\/\/.*|#.*/ },
+    // Block comments before strings; line comments (// and #) after strings
+    // so "https://..." and "#anchor" inside strings never become comments.
+    { cls: 'tk-comment', pattern: /\/\*[\s\S]*?\*\// },
     { cls: 'tk-decorator', pattern: /<\?(?:php|=)?|\?>/i },
-    { cls: 'tk-string', pattern: /"(?:\\.|\$[A-Za-z_]\w*|[^"\\$])*"/, inside: [
+    { cls: 'tk-string', pattern: /"(?:\\.|\$[A-Za-z_]\w*|[^"\\$\n])*"/, inside: [
         { cls: 'tk-var', pattern: /\$[A-Za-z_]\w*/ },
     ]},
-    { cls: 'tk-string', pattern: /'(?:\\.|[^'\\])*'/ },
+    { cls: 'tk-string', pattern: /'(?:\\.|[^'\\\n])*'/ },
+    { cls: 'tk-comment', pattern: /\/\/.*|#.*/ },
     { cls: 'tk-var', pattern: /\$[A-Za-z_]\w*/ },
     { cls: 'tk-var-const', pattern: /\b[A-Z][A-Z0-9_]{2,}\b/ },
     { cls: 'tk-type', pattern: /(\b(?:class|interface|trait|enum|extends|implements|new)\s+)[A-Za-z_]\w*/, lookbehind: true },
@@ -427,12 +441,16 @@
   function cLikeGrammar(keywords, builtins, options) {
     const opts = options || {};
     const rules = [
+      // Block comments stay before strings (license headers quote freely);
+      // LINE comments come after strings so "https://..." never becomes a
+      // comment.
       { cls: 'tk-doc', pattern: /\/\*\*[\s\S]*?\*\// },
-      { cls: 'tk-comment', pattern: /\/\*[\s\S]*?\*\/|\/\/.*/ },
+      { cls: 'tk-comment', pattern: /\/\*[\s\S]*?\*\// },
       { cls: 'tk-decorator', pattern: /^\s*#\s*[A-Za-z_]\w*.*/m },
       { cls: 'tk-decorator', pattern: /@[A-Za-z_]\w*/ },
       { cls: 'tk-string', pattern: /"(?:\\.|[^"\\\n])*"/ },
       { cls: 'tk-string', pattern: /'(?:\\.|[^'\\\n])*'/ },
+      { cls: 'tk-comment', pattern: /\/\/.*/ },
       { cls: 'tk-var-const', pattern: /\b[A-Z][A-Z0-9_]{2,}\b/ },
       { cls: 'tk-type', pattern: /(\b(?:class|struct|interface|enum|trait|extends|implements|namespace|using|new|object|protocol|extension|mixin)\s+)[A-Za-z_]\w*/, lookbehind: true },
       { cls: 'tk-fn-decl', pattern: new RegExp('\\b(?!(?:' + CLIKE_DECL_SKIP + ')\\b)[A-Za-z_]\\w*(?=\\s*\\([^;{}]*\\)\\s*(?:const\\s*)?(?:->\\s*[A-Za-z_:][\\w:<>]*)?\\{)') },
@@ -447,13 +465,15 @@
     ];
 
     if (opts.rustMacros) {
-      rules.splice(10, 0, { cls: 'tk-fn-builtin', pattern: /\b[A-Za-z_]\w*!/ });
+      // Insert before the literal-keyword rule (index-independent).
+      const at = rules.findIndex((r) => r.pattern.source.includes('nullptr'));
+      rules.splice(at, 0, { cls: 'tk-fn-builtin', pattern: /\b[A-Za-z_]\w*!/ });
     }
 
     // Languages whose declarations don't always end in `(...) {` (e.g. Scala's
     // `def f(x: Int): Int = ...`) name the declaring keywords explicitly.
     if (opts.fnDeclKeywords) {
-      rules.splice(8, 0, {
+      rules.splice(rules.findIndex((r) => r.cls === 'tk-fn-decl'), 0, {
         cls: 'tk-fn-decl',
         pattern: new RegExp('(\\b(?:' + opts.fnDeclKeywords.join('|') + ')\\s+)[A-Za-z_]\\w*'),
         lookbehind: true,
@@ -591,11 +611,14 @@
   const RB_BUILTINS = 'puts print p gets raise lambda proc loop each map select reject reduce new'.split(' ');
 
   G.ruby = [
-    { cls: 'tk-comment', pattern: /#.*/ },
-    { cls: 'tk-string', pattern: /"(?:\\.|#\{[^}]*\}|[^"\\])*"/, inside: [
-        { cls: 'tk-operator', pattern: /#\{[^}]*\}/ },
+    // Strings must come before comments, else # inside "..." (incl. #{} interpolation)
+    // is eaten as a comment. String bodies stay single-line so an unpaired quote
+    // in a comment can't swallow following lines.
+    { cls: 'tk-string', pattern: /"(?:\\.|#\{[^}\n]*\}|[^"\\\n])*"/, inside: [
+        { cls: 'tk-operator', pattern: /#\{[^}\n]*\}/ },
     ]},
-    { cls: 'tk-string', pattern: /'(?:\\.|[^'\\])*'/ },
+    { cls: 'tk-string', pattern: /'(?:\\.|[^'\\\n])*'/ },
+    { cls: 'tk-comment', pattern: /#.*/ },
     { cls: 'tk-var-builtin', pattern: /[@$]{1,2}[A-Za-z_]\w*|\bself\b/ },
     { cls: 'tk-var-const', pattern: /\b[A-Z][A-Z0-9_]{2,}\b/ },
     { cls: 'tk-type', pattern: /(\b(?:class|module)\s+)[A-Z]\w*/, lookbehind: true },
@@ -623,10 +646,13 @@
   ).split(' ');
 
   G.lua = [
-    { cls: 'tk-comment', pattern: /--\[\[[\s\S]*?\]\]|--.*/ },
+    // Block comments before strings; line comments after strings so
+    // "not -- a comment" stays a string.
+    { cls: 'tk-comment', pattern: /--\[\[[\s\S]*?\]\]/ },
     { cls: 'tk-string',  pattern: /\[\[[\s\S]*?\]\]/ },
     { cls: 'tk-string',  pattern: /"(?:\\.|[^"\\\n])*"/ },
     { cls: 'tk-string',  pattern: /'(?:\\.|[^'\\\n])*'/ },
+    { cls: 'tk-comment', pattern: /--.*/ },
     { cls: 'tk-var-builtin', pattern: /\b(?:self|_G|_VERSION)\b/ },
     { cls: 'tk-fn-decl',
       pattern: /(\bfunction\s+)[A-Za-z_]\w*(?:[.:][A-Za-z_]\w*)?/,
@@ -653,8 +679,11 @@
   const SQL_BUILTINS = 'count sum avg min max coalesce nullif lower upper substr substring now date'.split(' ');
 
   G.sql = [
-    { cls: 'tk-comment', pattern: /--.*|\/\*[\s\S]*?\*\// },
+    // Block comments before strings; line comments after strings so
+    // 'not -- a comment' stays a string.
+    { cls: 'tk-comment', pattern: /\/\*[\s\S]*?\*\// },
     { cls: 'tk-string', pattern: /'(?:''|[^'])*'|"(?:\\"|[^"])*"/ },
+    { cls: 'tk-comment', pattern: /--.*/ },
     { cls: 'tk-keyword', pattern: new RegExp('\\b(?:' + SQL_KEYWORDS.join('|') + ')\\b', 'i') },
     { cls: 'tk-fn-builtin', pattern: new RegExp('\\b(?:' + SQL_BUILTINS.join('|') + ')\\b', 'i') },
     { cls: 'tk-number', pattern: /-?\b\d+(?:\.\d+)?\b/ },
@@ -666,8 +695,9 @@
   // YAML
   // ============================================================
   G.yaml = [
+    // Strings before comments, else # inside "..." is eaten as a comment
+    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\\n])*"|'(?:''|[^'\n])*'/ },
     { cls: 'tk-comment', pattern: /#.*/ },
-    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\])*"|'(?:''|[^'])*'/ },
     { cls: 'tk-type', pattern: /^(\s*)[A-Za-z_][\w.-]*(?=\s*:)/m, lookbehind: true },
     { cls: 'tk-decorator', pattern: /[&*][A-Za-z_][\w-]*/ },
     { cls: 'tk-keyword', pattern: /\b(?:true|false|null|yes|no|on|off)\b/i },
@@ -722,8 +752,9 @@
   ).split(' ');
 
   G.r = [
+    // Strings before comments, else # inside "..." is eaten as a comment
+    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/ },
     { cls: 'tk-comment', pattern: /#.*/ },
-    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/ },
     { cls: 'tk-fn-decl', pattern: /\b[A-Za-z._][\w.]*(?=\s*(?:<-|=)\s*function\b)/ },
     { cls: 'tk-keyword', pattern: wordPattern(R_KEYWORDS) },
     { cls: 'tk-fn-builtin',
@@ -750,11 +781,12 @@
 
   G.perl = [
     { cls: 'tk-doc', pattern: /^=\w+[\s\S]*?^=cut\s*$/m },
-    { cls: 'tk-comment', pattern: /#.*/ },
-    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\])*"/, inside: [
+    // Strings before comments, else # inside "..." is eaten as a comment
+    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\\n])*"/, inside: [
         { cls: 'tk-var', pattern: /[$@][A-Za-z_]\w*/ },
     ]},
-    { cls: 'tk-string', pattern: /'(?:\\.|[^'\\])*'/ },
+    { cls: 'tk-string', pattern: /'(?:\\.|[^'\\\n])*'/ },
+    { cls: 'tk-comment', pattern: /#.*/ },
     { cls: 'tk-regex', pattern: /((?:=~|!~)\s*)(?:m|s|tr|y)?\/(?:\\.|[^/\n])*\/[a-z]*/, lookbehind: true },
     { cls: 'tk-var-builtin', pattern: /\$[_0-9&`'+^!]|\$\^\w|\@ARGV\b|\%ENV\b|\$0\b/ },
     { cls: 'tk-var', pattern: /\$#?[A-Za-z_]\w*|[@%][A-Za-z_]\w*|\$\{[^}]+\}/ },
@@ -778,11 +810,14 @@
   ).split(' ');
 
   G.powershell = [
-    { cls: 'tk-comment', pattern: /<#[\s\S]*?#>|#.*/ },
-    { cls: 'tk-string', pattern: /"(?:`.|\$\w+|\$\{[^}]*\}|[^"`$])*"/, inside: [
+    // Block comments before strings; line comments after strings so
+    // "not # a comment" stays a string.
+    { cls: 'tk-comment', pattern: /<#[\s\S]*?#>/ },
+    { cls: 'tk-string', pattern: /"(?:`.|\$\w+|\$\{[^}]*\}|[^"`$\n])*"/, inside: [
         { cls: 'tk-var-builtin', pattern: /\$\{[^}]+\}|\$\w+/ },
     ]},
-    { cls: 'tk-string', pattern: /'[^']*'/ },
+    { cls: 'tk-string', pattern: /'[^'\n]*'/ },
+    { cls: 'tk-comment', pattern: /#.*/ },
     { cls: 'tk-decorator', pattern: /\[[A-Za-z][\w.]*(?:\(\)|\[\])?\]/ },
     { cls: 'tk-var-builtin', pattern: /\$(?:_|PSItem|PSScriptRoot|PSCommandPath|args|input|this|null|true|false|error|home|host|profile|pid|pwd)\b|\$env:\w+/i },
     { cls: 'tk-var', pattern: /\$\{[^}]+\}|\$\w+/ },
@@ -811,11 +846,12 @@
 
   G.elixir = [
     { cls: 'tk-doc', pattern: /@(?:moduledoc|doc)\s+"""[\s\S]*?"""/ },
-    { cls: 'tk-comment', pattern: /#.*/ },
-    { cls: 'tk-string', pattern: /"""[\s\S]*?"""|"(?:\\.|#\{[^}]*\}|[^"\\])*"/, inside: [
-        { cls: 'tk-operator', pattern: /#\{[^}]*\}/ },
+    // Strings before comments, else # inside "..." (incl. #{} interpolation) is eaten
+    { cls: 'tk-string', pattern: /"""[\s\S]*?"""|"(?:\\.|#\{[^}\n]*\}|[^"\\\n])*"/, inside: [
+        { cls: 'tk-operator', pattern: /#\{[^}\n]*\}/ },
     ]},
-    { cls: 'tk-string', pattern: /'(?:\\.|[^'\\])*'/ },
+    { cls: 'tk-string', pattern: /'(?:\\.|[^'\\\n])*'/ },
+    { cls: 'tk-comment', pattern: /#.*/ },
     { cls: 'tk-decorator', pattern: /@[a-z_]\w*/ },
     { cls: 'tk-var-const', pattern: /:[a-z_]\w*[?!]?/ },
     { cls: 'tk-fn-decl', pattern: /(\b(?:defp?|defmacrop?|defguard|defdelegate)\s+)[a-z_]\w*[?!]?/, lookbehind: true },
@@ -843,8 +879,11 @@
   ).split(' ');
 
   G.haskell = [
-    { cls: 'tk-comment', pattern: /\{-[\s\S]*?-\}|--.*/ },
-    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\])*"/ },
+    // Block comments before strings; line comments after strings so
+    // "not -- a comment" stays a string.
+    { cls: 'tk-comment', pattern: /\{-[\s\S]*?-\}/ },
+    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\\n])*"/ },
+    { cls: 'tk-comment', pattern: /--.*/ },
     { cls: 'tk-fn-decl', pattern: /^[a-z_][\w']*(?=\s*::)/m },
     { cls: 'tk-keyword', pattern: wordPattern(HS_KEYWORDS) },
     { cls: 'tk-type', pattern: /\b[A-Z][\w']*/ },
@@ -859,8 +898,9 @@
   // GraphQL
   // ============================================================
   G.graphql = [
+    // Strings before comments so "not # a comment" stays a string.
+    { cls: 'tk-string', pattern: /"""[\s\S]*?"""|"(?:\\.|[^"\\\n])*"/ },
     { cls: 'tk-comment', pattern: /#.*/ },
-    { cls: 'tk-string', pattern: /"""[\s\S]*?"""|"(?:\\.|[^"\\])*"/ },
     { cls: 'tk-decorator', pattern: /@[A-Za-z_]\w*/ },
     { cls: 'tk-var-param', pattern: /\$[A-Za-z_]\w*/ },
     { cls: 'tk-keyword', pattern: /\b(?:query|mutation|subscription|fragment|on|type|interface|union|enum|input|scalar|schema|directive|extend|implements|repeatable|true|false|null)\b/ },
@@ -875,9 +915,11 @@
   // TOML / INI
   // ============================================================
   G.toml = [
-    { cls: 'tk-comment', pattern: /#.*/ },
+    // Table headers first (they may contain quoted keys), then strings before
+    // comments, else # inside "..." is eaten as a comment
     { cls: 'tk-tag', pattern: /^[ \t]*\[\[?[^\]\n]+\]\]?/m },
-    { cls: 'tk-string', pattern: /"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|'[^'\n]*'/ },
+    { cls: 'tk-string', pattern: /"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\\n])*"|'[^'\n]*'/ },
+    { cls: 'tk-comment', pattern: /#.*/ },
     { cls: 'tk-type', pattern: /^(\s*)[A-Za-z0-9_.-]+(?=\s*=)/m, lookbehind: true },
     { cls: 'tk-keyword', pattern: /\b(?:true|false)\b/ },
     { cls: 'tk-number', pattern: /\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?|[+-]?\b(?:0[xX][\da-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|inf|nan)\b/ },
@@ -902,8 +944,9 @@
   // Dockerfile
   // ============================================================
   G.dockerfile = [
+    // Strings before comments so "not # a comment" stays a string.
+    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\\n])*"|'[^'\n]*'/ },
     { cls: 'tk-comment', pattern: /#.*/ },
-    { cls: 'tk-string', pattern: /"(?:\\.|[^"\\])*"|'[^'\n]*'/ },
     { cls: 'tk-keyword', pattern: /^\s*(?:FROM|RUN|CMD|LABEL|MAINTAINER|EXPOSE|ENV|ADD|COPY|ENTRYPOINT|VOLUME|USER|WORKDIR|ARG|ONBUILD|STOPSIGNAL|HEALTHCHECK|SHELL)\b|\bAS\b/m },
     { cls: 'tk-var-builtin', pattern: /\$\{[^}]+\}|\$\w+/ },
     { cls: 'tk-decorator', pattern: /(^|\s)--[\w-]+(?==|\s|$)/, lookbehind: true },
@@ -1327,6 +1370,11 @@
   }
 
   const JSRay = {
+    /**
+     * Runtime version, for shell/core compatibility negotiation.
+     * Must match version.json — tools/check-versions.mjs asserts it.
+     */
+    version: '0.0.1-internal.2',
     languages: G,
     normalizeLanguage,
     detectLanguage,
