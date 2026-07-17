@@ -14,7 +14,7 @@ It has its own version and release notes. It bundles a snapshot of JSRay Core (`
 
 `jsray` renders code in the terminal with ANSI colors, powered by the **same tokenizer and the same palettes** as every other JSRay surface: `JSRay.tokenize()` produces a renderer-agnostic token stream, and this project maps it to ANSI escape sequences instead of HTML spans. Six-family separation included — parameters italic amber, declarations bold mint, keywords bold.
 
-- **34 language families** (everything Core supports), auto-detected from the file extension, filename (`Dockerfile`, `Makefile`), or content
+- **35 language families** (everything Core supports), auto-detected from the file extension, filename (`Dockerfile`, `Makefile`), or content
 - **4 palettes × dark/light**: default, aurora, ember, fjord
 - **Truecolor** by default, with xterm-256 downsampling and plain-text fallback; piped output degrades to plain automatically
 - **Zero dependencies** — plain Node ≥ 18
