@@ -2,7 +2,7 @@
   "name": "JSRay",
   "author": "Eric Liu",
   "version": "0.0.1-internal.2",
-  "description": "Default palette · 22 token classes · 6 identifier families visually separated",
+  "description": "Default palette · 23 token classes · 6 identifier families visually separated",
   "philosophy": {
     "identifier-families": {
       "variable": "neutral foreground (no special color)",

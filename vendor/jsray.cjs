@@ -1,6 +1,6 @@
 /*!
  * JSRay
- * JavaScript-native code rendering kernel · 22-class token semantics.
+ * JavaScript-native code rendering kernel · 23-class token semantics.
  * Usage: <pre><code class="language-js">…</code></pre> + <script src="jsray.js">
  *
  * @author  Eric Liu
@@ -1361,10 +1361,23 @@
     set('--jr-gutter-fg', themeBlock.gutter);
     set('--jr-line-hl',   themeBlock.lineHighlight);
     const tokens = themeBlock.tokens || {};
+    // Fallback chain: a missing refined key resolves through its base
+    // (function.declaration → function), so palettes that predate a newly
+    // added key keep working — the vocabulary can grow in minor versions.
+    const resolveColor = (key) => {
+      let k = key;
+      while (k) {
+        const tok = tokens[k];
+        if (tok && tok.color) return tok.color;
+        const dot = k.lastIndexOf('.');
+        k = dot === -1 ? '' : k.slice(0, dot);
+      }
+      return null;
+    };
     for (const key in THEME_ALIAS) {
-      const tok = tokens[key];
-      if (tok && tok.color) {
-        set('--jr-' + THEME_ALIAS[key], tok.color);
+      const color = resolveColor(key);
+      if (color) {
+        set('--jr-' + THEME_ALIAS[key], color);
       }
     }
   }

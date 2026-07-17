@@ -67,3 +67,19 @@ test('withLineNumbers: pads to width and prefixes every line', () => {
   assert.match(eleven.split('\n')[0], /^ 1 │ x$/);
   assert.match(eleven.split('\n')[10], /^11 │ x$/);
 });
+
+test('buildStyles: refined keys fall back to their base family', () => {
+  const themeBlock = {
+    foreground: '#ffffff',
+    tokens: {
+      'function': { color: '#123456' },
+      'variable': { color: '#abcdef' },
+    },
+  };
+  const styles = buildStyles(themeBlock, 'truecolor');
+  assert.equal(styles['tk-fn-decl'], styles['tk-function'].replace('\x1b[1m', '') + '\x1b[1m',
+    'declaration inherits function color, keeps its forced bold');
+  assert.ok(styles['tk-fn-builtin'].includes('18;52;86'.split(';').join(';')) || styles['tk-fn-builtin'].includes('38;2;18;52;86'),
+    'builtin falls back to function color');
+  assert.ok(styles['tk-var-param'].includes('38;2;171;205;239'), 'parameter falls back to variable color');
+});
