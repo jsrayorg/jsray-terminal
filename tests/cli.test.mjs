@@ -1,7 +1,7 @@
 // End-to-end CLI tests: spawn the real bin with controlled stdin/argv.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { writeFileSync, mkdtempSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -83,4 +83,14 @@ test('invalid flags exit non-zero', () => {
   for (const args of [['--mode', 'sepia'], ['--color', 'cmyk'], ['--theme', 'nope'], ['--bogus']]) {
     assert.throws(() => run(args, 'x'), /Command failed|exit/i.test('') ? undefined : Error, args.join(' '));
   }
+});
+
+test('early-closing downstream pipe does not crash (EPIPE)', () => {
+
+  // head closes the pipe after 1 line; jsray must exit cleanly (status 0)
+  const out = execSync(
+    `printf 'a\\nb\\nc\\n' | node ${JSON.stringify(BIN)} --lang js --color truecolor | head -1; echo "rc=$?"`,
+    { encoding: 'utf8', shell: '/bin/sh' }
+  );
+  assert.match(out, /rc=0/);
 });

@@ -128,6 +128,13 @@ function readInput(file) {
 }
 
 // ---------------------------------------------------------------------------
+// A downstream pipe closing early (`jsray file | head`) must end the program
+// quietly, not crash with an unhandled EPIPE.
+process.stdout.on('error', (err) => {
+  if (err.code === 'EPIPE') process.exit(0);
+  throw err;
+});
+
 const opts = parseArgs(process.argv.slice(2));
 
 if (opts.help) { process.stdout.write(HELP); process.exit(0); }
