@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, copyFileSync, appendFileSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -103,17 +103,24 @@ test('the bundled Core verifies against its official digests', () => {
 });
 
 test('a modified engine is detected', () => {
-  const engine = resolve(ROOT, 'vendor/jsray.cjs');
-  const original = readFileSync(engine);
-  try {
-    writeFileSync(engine, Buffer.concat([original, Buffer.from('\n// tampered\n')]));
-    const report = verifyCore();
-    assert.equal(report.status, 'modified');
-    assert.deepEqual(report.mismatched, ['vendor/jsray.cjs']);
-  } finally {
-    writeFileSync(engine, original);
+  // Tampering with the tracked engine works until a run is interrupted, and
+  // then the repository is left holding a corrupted renderer. Verify a copy.
+  const dir = mkdtempSync(join(tmpdir(), 'jsray-cli-'));
+  const manifest = JSON.parse(readFileSync(resolve(ROOT, 'core-integrity.json'), 'utf8'));
+  writeFileSync(join(dir, 'core-integrity.json'), JSON.stringify(manifest));
+  for (const file of Object.keys(manifest.files)) {
+    mkdirSync(dirname(join(dir, file)), { recursive: true });
+    copyFileSync(resolve(ROOT, file), join(dir, file));
   }
-  assert.equal(verifyCore().status, 'official', 'the fixture must restore the engine');
+
+  assert.equal(verifyCore(dir).status, 'official', 'the copy starts intact');
+
+  appendFileSync(join(dir, 'vendor/jsray.cjs'), '\n// tampered\n');
+  const report = verifyCore(dir);
+
+  assert.equal(report.status, 'modified');
+  assert.deepEqual(report.mismatched, ['vendor/jsray.cjs']);
+  assert.equal(verifyCore().status, 'official', 'the real install is untouched');
 });
 
 test('the token map is derived from the bundled vocabulary, not transcribed', () => {
