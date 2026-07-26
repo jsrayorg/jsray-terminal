@@ -7,7 +7,7 @@
   "nextPublicBeta": "0.0.1-beta.1",
   "bundledCore": {
     "project": "jsray",
-    "version": "0.0.1-internal.2"
+    "version": "0.0.1-beta.1"
   },
   "notes": "Official open-source terminal integration in the JSRay ecosystem. Renders the JSRay Core token stream as ANSI escape sequences (truecolor with 256-color fallback) using the shared palette JSON."
 }

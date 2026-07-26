@@ -1,14 +1,27 @@
-# JSRay Terminal
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://jsray.org/assets/brand/jsray-logo-hero-dark.svg">
+    <img src="https://jsray.org/assets/brand/jsray-logo-hero-light.svg" alt="JSRay" width="420">
+  </picture>
+</p>
 
-This repository is the standalone terminal integration project around JSRay Core.
+**English** · [简体中文](README.zh-CN.md)
 
-Official site: [JSRay.org](https://jsray.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.0.1--internal.1-lightgrey)](CHANGELOG.md)
+[![Channel](https://img.shields.io/badge/channel-internal%20test-lightgrey)](CHANGELOG.md)
+[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/JSRayCore/JSRay)
+[![Node](https://img.shields.io/badge/node-%E2%89%A5%2018-339933)](package.json)
 
-This is an official open-source integration in the JSRay ecosystem.
+> JSRay code rendering for the terminal · ANSI truecolor · 35 language families · zero dependencies
 
-Current channel: internal test. No public beta has been released yet.
+<sub>Internal test build · no public beta yet · bundles a JSRay Core snapshot</sub>
 
-It has its own version and release notes. It bundles a snapshot of JSRay Core (`vendor/jsray.cjs`), but it is not the Core renderer project itself.
+---
+
+This repository is the standalone **terminal CLI** project around [JSRay Core](https://github.com/JSRayCore/JSRay) — an official open-source integration in the JSRay ecosystem, with its own version and release notes.
+
+It **bundles a snapshot** of Core (`vendor/jsray.cjs`) rather than depending on it at runtime, so the CLI keeps working exactly as shipped until a sync deliberately advances it.
 
 ## What it does
 

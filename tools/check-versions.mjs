@@ -40,6 +40,16 @@ expect(existsSync('palettes/default.json'), 'palettes/default.json missing — r
 // Opportunistic drift check against a sibling Core checkout.
 // Day-to-day drift is ADVISORY (integrations batch Core updates); it only
 // fails in strict mode: JSRAY_STRICT_DRIFT=1 or --strict (packaging/release).
+// Documentation baseline, shared with Core: both READMEs keep the Core-vs-integration
+// boundary statement, and the governance files are present.
+const includes = (path, needle, label = needle) =>
+  expect(existsSync(path) && read(path).includes(needle), `${path} is missing ${label}`);
+includes('README.md', 'bundles a snapshot', 'the Core snapshot boundary statement');
+includes('README.zh-CN.md', '内置 Core 的快照', 'the Core snapshot boundary statement');
+for (const doc of ['LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'CODE_OF_CONDUCT.md']) {
+  expect(existsSync(doc), `${doc} missing — the ecosystem baseline requires it`);
+}
+
 const strictDrift = process.env.JSRAY_STRICT_DRIFT === '1' || process.argv.includes('--strict');
 const warns = [];
 const expectDrift = (condition, message) => {

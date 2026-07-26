@@ -1387,7 +1387,7 @@
      * Runtime version, for shell/core compatibility negotiation.
      * Must match version.json — tools/check-versions.mjs asserts it.
      */
-    version: '0.0.1-internal.2',
+    version: '0.0.1-beta.1',
     languages: G,
     normalizeLanguage,
     detectLanguage,

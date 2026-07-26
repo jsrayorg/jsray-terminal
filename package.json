@@ -6,6 +6,13 @@
   "author": "Eric Liu <eric@jsray.org>",
   "license": "MIT",
   "homepage": "https://jsray.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JSRayCore/jsray-terminal.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JSRayCore/jsray-terminal/issues"
+  },
   "type": "module",
   "bin": {
     "jsray": "./bin/jsray.mjs"
