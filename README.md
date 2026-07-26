@@ -77,6 +77,36 @@ npm run sync:core      # expects Core at ../jsray, or set JSRAY_CORE_DIR
 
 `npm run check:versions` fails if the bundle drifts from a sibling Core checkout.
 
+## Core integrity
+
+The CLI runs the bundled engine straight off disk, so the file rendering your
+code is one careless `npm install` script away from being something else.
+`core-integrity.json` pins the digests JSRay Core published for this snapshot,
+and every run verifies them — hashing ~70KB costs far less than Node's own
+startup.
+
+```sh
+jsray --verify-core
+# official build verified — JSRay Core 0.0.1-beta.2, 6 files
+```
+
+A mismatch warns on **stderr** and still renders, so it can never contaminate a
+pipeline; `--verify-core` exits non-zero for use in a script.
+
+## Custom palettes
+
+```sh
+jsray app.js --palette ~/my-colors.json          # layered over --theme
+jsray app.js --theme fjord --palette ~/tweak.json
+```
+
+Takes the same JSON every other JSRay surface uses — what the
+[Theme Studio](https://jsray.org/studio.html) exports — so one palette file
+works in the terminal, on the web, and in the editor. Tokens you omit keep the
+built-in palette's value. Keys are checked against the bundled `vocabulary.json`;
+unknown ones (from a newer Core) are reported on stderr and skipped rather than
+being fatal.
+
 ## Renderer boundary
 
 The ANSI layer consumes only the ecosystem token-stream contract (`tokenize(code, lang)` → strings and `{type, content}` nodes). Any renderer that produces this shape can be dropped into `vendor/`.

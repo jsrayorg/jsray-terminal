@@ -13,7 +13,10 @@ import { readFileSync } from 'node:fs';
 import { basename, extname, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { loadPalette, listPalettes, buildStyles, renderStream, withLineNumbers } from '../lib/ansi.mjs';
+import {
+  loadPalette, listPalettes, buildStyles, renderStream, withLineNumbers,
+  verifyCore, loadCustomPalette, mergePalettes,
+} from '../lib/ansi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -55,14 +58,18 @@ Options:
   -n, --line-numbers            show line numbers
       --color <auto|truecolor|256|none>
                                 color output (default: auto)
+      --palette <file.json>     custom palette layered over --theme
+                                (the JSON the JSRay Theme Studio exports)
       --list-languages          print supported language ids
       --list-themes             print available themes
+      --verify-core             check the bundled JSRay Core against its
+                                official digests, then exit
   -h, --help                    show this help
   -v, --version                 print version
 `;
 
 function parseArgs(argv) {
-  const opts = { file: null, lang: '', theme: 'default', mode: 'dark', color: 'auto', lineNumbers: false };
+  const opts = { file: null, lang: '', theme: 'default', mode: 'dark', color: 'auto', lineNumbers: false, palette: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {
@@ -73,6 +80,8 @@ function parseArgs(argv) {
       case '-n': case '--line-numbers': opts.lineNumbers = true; break;
       case '--list-languages': opts.listLanguages = true; break;
       case '--list-themes': opts.listThemes = true; break;
+      case '--palette': opts.palette = argv[++i] || ''; break;
+      case '--verify-core': opts.verifyCore = true; break;
       case '-h': case '--help': opts.help = true; break;
       case '-v': case '--version': opts.showVersion = true; break;
       default:
@@ -140,6 +149,29 @@ const opts = parseArgs(process.argv.slice(2));
 if (opts.help) { process.stdout.write(HELP); process.exit(0); }
 if (opts.showVersion) { process.stdout.write(VERSION + '\n'); process.exit(0); }
 if (opts.listThemes) { process.stdout.write(listPalettes().join('\n') + '\n'); process.exit(0); }
+
+if (opts.verifyCore) {
+  const report = verifyCore();
+  const summary = {
+    official: `official build verified — JSRay Core ${report.version}, ${report.checked} files`,
+    modified: `MODIFIED — these files do not match JSRay Core ${report.version}: ${report.mismatched.join(', ')}`,
+    unknown: 'unverified — no integrity manifest is bundled with this install',
+  }[report.status];
+  process.stdout.write(summary + '\n');
+  process.exit(report.status === 'official' ? 0 : 1);
+}
+
+// A tampered engine is worth saying out loud, but not worth refusing to render
+// over — the warning goes to stderr so it never contaminates a pipeline.
+{
+  const report = verifyCore();
+  if (report.status === 'modified') {
+    process.stderr.write(
+      `jsray: warning — the bundled JSRay Core does not match its official build ` +
+      `(${report.mismatched.join(', ')}). Reinstall to restore it; run 'jsray --verify-core' for detail.\n`
+    );
+  }
+}
 if (opts.listLanguages) {
   process.stdout.write(Object.keys(JSRay.languages).sort().join('\n') + '\n');
   process.exit(0);
@@ -154,6 +186,12 @@ const lang = languageFor(opts.file, code, opts.lang);
 let palette;
 try {
   palette = loadPalette(opts.theme);
+
+  if (opts.palette) {
+    const { palette: custom, warnings } = loadCustomPalette(opts.palette);
+    for (const warning of warnings) process.stderr.write(`jsray: ${warning}\n`);
+    palette = mergePalettes(palette, custom);
+  }
 } catch (err) {
   fail(err.message);
 }

@@ -77,6 +77,26 @@ npm run sync:core      # 默认在 ../jsray 寻找 Core,也可设置 JSRAY_CORE_
 
 只要同级存在 Core 检出,`npm run check:versions` 就会在快照漂移时报错。
 
+## 内核完整性校验
+
+CLI 直接运行磁盘上的内置引擎 —— 也就是说,真正渲染你代码的那个文件,离"被某个 `npm install` 脚本换掉"只有一步之遥。`core-integrity.json` 钉住了 JSRay Core 为该快照发布的摘要,每次运行都会校验(哈希 ~70KB 的开销远小于 Node 自身启动)。
+
+```sh
+jsray --verify-core
+# official build verified — JSRay Core 0.0.1-beta.2, 6 files
+```
+
+不匹配时警告走 **stderr** 并照常渲染,绝不污染管道;`--verify-core` 会以非零码退出,便于写进脚本。
+
+## 自定义调色板
+
+```sh
+jsray app.js --palette ~/my-colors.json          # 叠加在 --theme 之上
+jsray app.js --theme fjord --palette ~/tweak.json
+```
+
+接受与其它所有 JSRay 表面相同的 JSON —— 即[主题工作台](https://jsray.org/studio.html)导出的格式 —— 因此一份调色板文件在终端、网页和编辑器里通用。没写的 token 沿用内置调色板取值。键名按内置的 `vocabulary.json` 校验;来自更新版 Core 的未知键会在 stderr 上提示并跳过,而不是直接报错。
+
 ## 渲染器边界
 
 ANSI 层只消费生态约定的 token 流契约(`tokenize(code, lang)` → 字符串与 `{type, content}` 节点)。任何产出该形状的渲染器都可以直接放进 `vendor/` 使用。

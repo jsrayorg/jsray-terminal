@@ -36,6 +36,8 @@ expect(pkg.bin?.jsray === './bin/jsray.mjs', 'package.json must expose the jsray
 expect(existsSync('bin/jsray.mjs'), 'bin/jsray.mjs missing');
 expect(existsSync('vendor/jsray.cjs'), 'vendor/jsray.cjs missing — run tools/sync-core.sh');
 expect(existsSync('palettes/default.json'), 'palettes/default.json missing — run tools/sync-core.sh');
+expect(existsSync('vocabulary.json'), 'vocabulary.json missing — run tools/sync-core.sh');
+expect(existsSync('core-integrity.json'), 'core-integrity.json missing — run tools/sync-core.sh');
 
 // Opportunistic drift check against a sibling Core checkout.
 // Day-to-day drift is ADVISORY (integrations batch Core updates); it only

@@ -1,0 +1,43 @@
+{
+  "project": "jsray",
+  "version": "0.0.1-beta.2",
+  "description": "Machine-readable token vocabulary: the three-name lock-step every JSRay surface shares. A palette key maps to one CSS custom property (--jr-<suffix>) and one runtime class (tk-<suffix>).",
+  "tokens": {
+    "keyword": "keyword",
+    "function": "function",
+    "function.declaration": "fn-decl",
+    "function.builtin": "fn-builtin",
+    "variable": "var",
+    "variable.parameter": "var-param",
+    "variable.builtin": "var-builtin",
+    "variable.constant": "var-const",
+    "type": "type",
+    "property": "property",
+    "string": "string",
+    "string.regex": "regex",
+    "number": "number",
+    "comment": "comment",
+    "comment.doc": "doc",
+    "decorator": "decorator",
+    "operator": "operator",
+    "punctuation": "punct",
+    "tag": "tag",
+    "attribute": "attr",
+    "selector": "selector",
+    "css.property": "css-prop",
+    "css.unit": "css-unit"
+  },
+  "surfaces": {
+    "background": "bg",
+    "foreground": "fg",
+    "border": "border",
+    "gutter": "gutter-fg",
+    "lineHighlight": "line-hl"
+  },
+  "fontStyles": [
+    "bold",
+    "italic",
+    "bold italic",
+    "normal"
+  ]
+}

@@ -2,7 +2,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
-import { loadPalette, listPalettes, buildStyles, renderStream, rgbTo256, withLineNumbers } from '../lib/ansi.mjs';
+import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { dirname, resolve, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import {
+  loadPalette, listPalettes, buildStyles, renderStream, rgbTo256, withLineNumbers,
+  verifyCore, loadCustomPalette, mergePalettes,
+} from '../lib/ansi.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const require = createRequire(import.meta.url);
 const JSRay = require('../vendor/jsray.cjs');
@@ -82,4 +91,82 @@ test('buildStyles: refined keys fall back to their base family', () => {
   assert.ok(styles['tk-fn-builtin'].includes('18;52;86'.split(';').join(';')) || styles['tk-fn-builtin'].includes('38;2;18;52;86'),
     'builtin falls back to function color');
   assert.ok(styles['tk-var-param'].includes('38;2;171;205;239'), 'parameter falls back to variable color');
+});
+
+// --- core integrity & custom palettes ---------------------------------------
+
+test('the bundled Core verifies against its official digests', () => {
+  const report = verifyCore();
+  assert.equal(report.status, 'official', `mismatched: ${report.mismatched.join(', ')}`);
+  assert.ok(report.checked >= 6, 'the engine and every palette should be covered');
+  assert.match(report.version, /^\d+\.\d+\.\d+/);
+});
+
+test('a modified engine is detected', () => {
+  const engine = resolve(ROOT, 'vendor/jsray.cjs');
+  const original = readFileSync(engine);
+  try {
+    writeFileSync(engine, Buffer.concat([original, Buffer.from('\n// tampered\n')]));
+    const report = verifyCore();
+    assert.equal(report.status, 'modified');
+    assert.deepEqual(report.mismatched, ['vendor/jsray.cjs']);
+  } finally {
+    writeFileSync(engine, original);
+  }
+  assert.equal(verifyCore().status, 'official', 'the fixture must restore the engine');
+});
+
+test('the token map is derived from the bundled vocabulary, not transcribed', () => {
+  const vocabulary = JSON.parse(readFileSync(resolve(ROOT, 'vocabulary.json'), 'utf8'));
+  const styles = buildStyles(loadPalette('default').themes.dark, 'truecolor');
+
+  // Every token Core declares must produce a style, or a Core that grows a
+  // token would render unstyled here.
+  for (const suffix of Object.values(vocabulary.tokens)) {
+    assert.ok(styles[`tk-${suffix}`], `tk-${suffix} has no terminal style`);
+  }
+});
+
+test('a custom palette layers over the built-in one', () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'jsray-palette-')), 'neon.json');
+  writeFileSync(file, JSON.stringify({
+    themes: { dark: { tokens: { keyword: { color: '#FF00AA', fontStyle: 'bold' } } } },
+  }));
+
+  const { palette, warnings } = loadCustomPalette(file);
+  assert.deepEqual(warnings, []);
+
+  const merged = mergePalettes(loadPalette('default'), palette);
+  assert.equal(merged.themes.dark.tokens.keyword.color, '#FF00AA');
+  // Untouched tokens keep the built-in value.
+  assert.equal(
+    merged.themes.dark.tokens.string.color,
+    loadPalette('default').themes.dark.tokens.string.color
+  );
+});
+
+test('a custom palette cannot smuggle in non-colors or unknown tokens', () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'jsray-palette-')), 'bad.json');
+  writeFileSync(file, JSON.stringify({
+    themes: { dark: { tokens: {
+      keyword: { color: '#FF00AA' },
+      string: { color: '\x1b[31m' },              // an escape sequence, not a color
+      number: { color: 'red; rm -rf /' },
+      'lifetime.annotation': { color: '#123456' }, // from a newer Core
+    } } },
+  }));
+
+  const { palette, warnings } = loadCustomPalette(file);
+  const tokens = palette.themes.dark.tokens;
+
+  assert.deepEqual(Object.keys(tokens), ['keyword'], 'only the valid token survives');
+  assert.equal(warnings.length, 3);
+  assert.ok(warnings.some((w) => w.includes('lifetime.annotation')));
+});
+
+test('a palette file with no usable theme is rejected outright', () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'jsray-palette-')), 'empty.json');
+  writeFileSync(file, JSON.stringify({ themes: { solarized: {} } }));
+  assert.throws(() => loadCustomPalette(file), /no usable dark or light theme/);
+  assert.throws(() => loadCustomPalette('/nope/missing.json'), /not found/);
 });

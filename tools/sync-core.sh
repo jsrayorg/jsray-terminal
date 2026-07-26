@@ -22,6 +22,10 @@ if [ -d "$CORE_DIR/themes" ]; then
   cp "$CORE_DIR"/themes/*.json palettes/ 2>/dev/null || true
 fi
 
+# The token vocabulary travels with the snapshot: it is what maps a tk-* class
+# to a palette key, and what a user palette is validated against.
+cp "$CORE_DIR/vocabulary.json" vocabulary.json
+
 if command -v node >/dev/null 2>&1; then
   node tools/sync-core-version.mjs "$CORE_DIR"
 else

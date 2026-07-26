@@ -9,6 +9,13 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `--verify-core`: checks the bundled engine and palettes against the digests JSRay Core published for the snapshot. Verification also runs on every invocation, warning on stderr so a pipeline is never affected.
+- `--palette <file.json>`: layer a custom palette over any built-in theme, using the same JSON the Theme Studio exports. Keys are validated against the bundled vocabulary; unknown ones are reported and skipped so palettes stay portable across Core versions.
+
+### Changed
+- The tk-class → palette-key map is derived from Core's `vocabulary.json` instead of transcribed here. A transcription is how a Core that grows a token ends up silently unstyled in the terminal.
+
 ### Changed
 - Bundled Core snapshot advanced to **0.0.1-beta.1** (Core's first public beta).
 - Repository documentation aligned with Core: CHANGELOG, CONTRIBUTING, SECURITY, and Code of Conduct now match the ecosystem baseline, and the README carries the shared brand header and a Simplified Chinese translation.
