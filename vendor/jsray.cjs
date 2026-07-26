@@ -1387,7 +1387,7 @@
      * Runtime version, for shell/core compatibility negotiation.
      * Must match version.json — tools/check-versions.mjs asserts it.
      */
-    version: '0.0.1-beta.1',
+    version: '0.0.1-beta.2',
     languages: G,
     normalizeLanguage,
     detectLanguage,
@@ -1444,7 +1444,7 @@
       const code = el.textContent;
       if (!m && el.classList) el.classList.add('language-' + lang);
       el.innerHTML = this.highlight(code, lang);
-      el.dataset.cxLang = lang;
+      el.dataset.jsrayLang = lang;
     },
 
     /** Scan the document and highlight language-marked or plain <pre><code> blocks */
