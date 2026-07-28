@@ -3,7 +3,7 @@
   "version": "0.0.1-internal.1",
   "private": true,
   "description": "JSRay code rendering for the terminal: ANSI syntax highlighting powered by the JSRay Core tokenizer and palettes.",
-  "author": "Eric Liu <eric@jsray.org>",
+  "author": "Jie <jie@jsray.org>",
   "license": "MIT",
   "homepage": "https://jsray.org",
   "repository": {

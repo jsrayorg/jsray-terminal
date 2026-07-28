@@ -3,7 +3,7 @@
  * JavaScript-native code rendering kernel · 23-class token semantics.
  * Usage: <pre><code class="language-js">…</code></pre> + <script src="jsray.js">
  *
- * @author  Eric Liu
+ * @author  Jie
  * @license MIT
  * @see     https://jsray.org
  */
