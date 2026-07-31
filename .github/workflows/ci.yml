@@ -22,6 +22,11 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: Validate version metadata
         run: npm run check:versions
+      # The bundled Core is a copy and does not update itself. The drift check
+      # above compares against a sibling checkout and skips when Core is absent,
+      # which is every run here — so without this a stale engine passes CI.
+      - name: Bundled Core is the published Core
+        run: npm run check:core
       - name: Run tests
         run: npm test
       - name: CLI smoke

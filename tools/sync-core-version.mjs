@@ -16,12 +16,41 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const coreDir = process.argv[2] || '../jsray';
-const coreRelease = JSON.parse(readFileSync(resolve(coreDir, 'version.json'), 'utf8'));
 
-if (coreRelease.project !== 'jsray') {
-  console.error(`error: ${coreDir}/version.json is not the JSRay Core project`);
-  process.exit(1);
-}
+// Where the Core version comes from depends on what `coreDir` is.
+//
+// A checkout has version.json. An unpacked npm tarball does not — Core's
+// `files` array publishes the build output, not its release metadata. Reading
+// only version.json therefore restricted syncing to machines that happen to
+// have both repositories side by side, which is no CI runner anywhere. That is
+// the reason a Core fix could sit unpropagated: nothing automatic could apply
+// it. package.json ships in both and carries the same version.
+const coreRelease = (() => {
+  const releasePath = resolve(coreDir, 'version.json');
+
+  if (existsSync(releasePath)) {
+    const parsed = JSON.parse(readFileSync(releasePath, 'utf8'));
+    if (parsed.project !== 'jsray') {
+      console.error(`error: ${coreDir}/version.json is not the JSRay Core project`);
+      process.exit(1);
+    }
+    return parsed;
+  }
+
+  const pkgPath = resolve(coreDir, 'package.json');
+  if (!existsSync(pkgPath)) {
+    console.error(`error: ${coreDir} holds neither version.json nor package.json`);
+    console.error('       point this at a Core checkout or an unpacked @jsray/core tarball.');
+    process.exit(1);
+  }
+
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+  if (pkg.name !== '@jsray/core') {
+    console.error(`error: ${coreDir}/package.json is "${pkg.name}", not @jsray/core`);
+    process.exit(1);
+  }
+  return { project: 'jsray', version: pkg.version };
+})();
 
 const path = 'version.json';
 const release = JSON.parse(readFileSync(path, 'utf8'));

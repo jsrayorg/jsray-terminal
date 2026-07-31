@@ -1,7 +1,7 @@
 {
   "name": "JSRay",
   "author": "Jie",
-  "version": "0.0.1-beta.2",
+  "version": "0.0.1-beta.3",
   "description": "Default palette · 23 token classes · 6 identifier families visually separated",
   "philosophy": {
     "identifier-families": {
@@ -20,6 +20,9 @@
     "dark": {
       "background": "#1C1C1E",
       "foreground": "#E1E4E8",
+      "border": "#2C2C2E",
+      "gutter": "#48484A",
+      "lineHighlight": "rgba(255,255,255,0.05)",
       "tokens": {
         "keyword": {
           "color": "#D08BFC",
@@ -101,6 +104,9 @@
     "light": {
       "background": "#FFFFFF",
       "foreground": "#1C1C1E",
+      "border": "#E5E5EA",
+      "gutter": "#8E8E93",
+      "lineHighlight": "rgba(0,0,0,0.04)",
       "tokens": {
         "keyword": {
           "color": "#AD3DA4",

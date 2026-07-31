@@ -105,12 +105,6 @@
     'fetch setTimeout setInterval clearTimeout clearInterval requestAnimationFrame'
   ).split(' ');
 
-  const jsTemplateInner = [
-    { cls: 'tk-punct',  pattern: /^\$\{|\}$/ },
-    // Placeholder interior is treated as JS recursively (lazy ref to avoid init cycle)
-    { cls: 'tk-var',    pattern: RX.ident, inside: null /* placeholder */ },
-  ];
-
   // Parameter-list sub-grammar · colors n / name in (n: number, name = "x") as var-param
   const jsParamInside = [
     { cls: 'tk-punct',     pattern: /[(),]/ },
@@ -138,7 +132,14 @@
       inside: jsParamInside },
 
     // Template strings (with inline ${...})
-    { cls: 'tk-string',  pattern: /`(?:\\.|\$\{[^}]*\}|[^`\\])*`/, inside: [
+    //
+    // The fallback class excludes `$` and a bare `$` is admitted only when no
+    // `{` follows. Without that, `${a}` matches two ways — as one placeholder
+    // or character by character — and an unterminated template makes the
+    // engine try every combination: 26 placeholders took 8.7s to fail. Every
+    // interpolating grammar below keeps its fallback and its interpolation
+    // branch disjoint for the same reason.
+    { cls: 'tk-string',  pattern: /`(?:\\.|\$\{[^}]*\}|\$(?!\{)|[^`\\$])*`/, inside: [
         { cls: 'tk-operator', pattern: /\$\{[^}]*\}/, inside: [
             { cls: 'tk-punct', pattern: /^\$\{|\}$/ },
             // No JS recursion here; minimal coloring avoids rule cross-talk
@@ -190,11 +191,12 @@
     { cls: 'tk-operator', pattern: /=>|\.\.\.|\?\?=?|\?\.|<<=?|>>>?=?|<=|>=|===?|!==?|\*\*=?|\+\+|--|&&=?|\|\|=?|[+\-*/%&|^!<>=?]=?/ },
     { cls: 'tk-punct',    pattern: /[{}[\]();,.:]/ },
   ];
+  // Names that share this grammar but are not aliases of it: they normalize to
+  // themselves, so a TypeScript block stays labelled `typescript`. Pure aliases
+  // (ts, jsx, tsx, …) are declared once in LANGUAGE_ALIASES and registered here
+  // automatically — see the loop after that table.
   G.js = G.javascript;
   G.typescript = G.javascript;
-  G.ts = G.javascript;
-  G.jsx = G.javascript;
-  G.tsx = G.javascript;
 
   // ============================================================
   // Python
@@ -267,7 +269,6 @@
     { cls: 'tk-operator', pattern: /->|:=|\*\*=?|\/\/=?|<<=?|>>=?|<=|>=|==|!=|[+\-*/%&|^~<>=]=?/ },
     { cls: 'tk-punct',    pattern: /[{}[\]();,.:]/ },
   ];
-  G.py = G.python;
 
   // ============================================================
   // HTML
@@ -313,6 +314,12 @@
         { cls: 'tk-attr', pattern: /:[\w-]+(?:\([^)]*\))?/ }, // pseudo-classes
         { cls: 'tk-attr', pattern: /\[[^\]]+\]/ },             // attribute selectors
       ]},
+
+    // Custom properties, in both roles: the `--x:` declaration and the
+    // `var(--x)` reference. A leading `-` has no word boundary before it, so
+    // the plain-property rule below can only ever match `x` and leaves `--`
+    // uncolored — which is every line of JSRay's own theme stylesheets.
+    { cls: 'tk-css-prop', pattern: /--[\w-]+/ },
 
     // Declaration body: property: value;
     { cls: 'tk-css-prop',
@@ -361,8 +368,11 @@
     'docker kubectl python python3 pip pip3 ruby go cargo make brew apt yum';
 
   G.shell = [
-    // Strings before comments, else # inside "..." is eaten as a comment
-    { cls: 'tk-string',  pattern: /"(?:\\.|\$[\w{][^"\n]*|[^"\\$\n])*"/, inside: [
+    // Strings before comments, else # inside "..." is eaten as a comment.
+    // Each `$` form is matched exactly, never by a greedy run that could also
+    // swallow the ones after it — the old `\$[\w{][^"\n]*` overlapped itself
+    // and an unterminated string took two minutes to fail on 26 variables.
+    { cls: 'tk-string',  pattern: /"(?:\\.|\$\{[^}\n]*\}|\$\w+|\$(?![\w{])|[^"\\$\n])*"/, inside: [
         { cls: 'tk-var-builtin', pattern: /\$\{[^}]+\}|\$\w+/ },
     ]},
     { cls: 'tk-string',  pattern: /'[^'\n]*'/ },
@@ -383,9 +393,6 @@
     { cls: 'tk-operator', pattern: /&&|\|\||>>|<<|[|&;<>]/ },
     { cls: 'tk-punct',    pattern: /[(){}\[\]=]/ },
   ];
-  G.bash = G.shell;
-  G.sh = G.shell;
-  G.zsh = G.shell;
 
   // ============================================================
   // PHP
@@ -501,9 +508,6 @@
   ).split(' ');
   const CPP_BUILTINS = 'std cout cin cerr endl printf scanf malloc free make_unique make_shared move forward'.split(' ');
   G.cpp = cLikeGrammar(CPP_KEYWORDS, CPP_BUILTINS);
-  G.cc = G.cpp;
-  G.cxx = G.cpp;
-  G.hpp = G.cpp;
 
   const JAVA_KEYWORDS = (
     'abstract assert boolean break byte case catch char class const continue default do double ' +
@@ -524,7 +528,6 @@
   ).split(' ');
   const CS_BUILTINS = 'Console WriteLine Write ReadLine Math List Dictionary IEnumerable Task string int bool var'.split(' ');
   G.csharp = cLikeGrammar(CS_KEYWORDS, CS_BUILTINS);
-  G.cs = G.csharp;
 
   const GO_KEYWORDS = (
     'break default func interface select case defer go map struct chan else goto package switch ' +
@@ -532,7 +535,6 @@
   ).split(' ');
   const GO_BUILTINS = 'append cap close complex copy delete imag len make new panic print println real recover fmt'.split(' ');
   G.go = cLikeGrammar(GO_KEYWORDS, GO_BUILTINS);
-  G.golang = G.go;
 
   const RUST_KEYWORDS = (
     'as async await break const continue crate dyn else enum extern false fn for if impl in let ' +
@@ -541,7 +543,6 @@
   ).split(' ');
   const RUST_BUILTINS = 'println format vec panic assert assert_eq Some None Ok Err Result Option String Vec Box'.split(' ');
   G.rust = cLikeGrammar(RUST_KEYWORDS, RUST_BUILTINS, { rustMacros: true });
-  G.rs = G.rust;
 
   const SWIFT_KEYWORDS = (
     'associatedtype async await break case catch class continue default defer deinit do else enum ' +
@@ -561,8 +562,6 @@
   ).split(' ');
   const KOTLIN_BUILTINS = 'println print arrayOf listOf mutableListOf mapOf setOf sequenceOf require check error String Int Long Double Float Boolean Unit Any Nothing'.split(' ');
   G.kotlin = cLikeGrammar(KOTLIN_KEYWORDS, KOTLIN_BUILTINS);
-  G.kt = G.kotlin;
-  G.kts = G.kotlin;
 
   const DART_KEYWORDS = (
     'abstract as assert async await break case catch class const continue covariant default deferred ' +
@@ -583,7 +582,6 @@
     'String Int Long Double Boolean Unit Any Nothing'
   ).split(' ');
   G.scala = cLikeGrammar(SCALA_KEYWORDS, SCALA_BUILTINS, { fnDeclKeywords: ['def'] });
-  G.sc = G.scala;
 
   const OBJC_KEYWORDS = C_KEYWORDS.concat((
     'id instancetype self super in out inout bycopy byref oneway ' +
@@ -598,7 +596,6 @@
   // @interface / @implementation / @property etc. are colored by the generic
   // c-like `@word` decorator rule.
   G.objectivec = cLikeGrammar(OBJC_KEYWORDS, OBJC_BUILTINS);
-  G.objc = G.objectivec;
 
   // ============================================================
   // Ruby
@@ -614,7 +611,9 @@
     // Strings must come before comments, else # inside "..." (incl. #{} interpolation)
     // is eaten as a comment. String bodies stay single-line so an unpaired quote
     // in a comment can't swallow following lines.
-    { cls: 'tk-string', pattern: /"(?:\\.|#\{[^}\n]*\}|[^"\\\n])*"/, inside: [
+    // Fallback excludes `#`; a bare `#` is admitted only when no `{` follows,
+    // so `#{...}` has exactly one parse (see the JS template-string note).
+    { cls: 'tk-string', pattern: /"(?:\\.|#\{[^}\n]*\}|#(?!\{)|[^"\\\n#])*"/, inside: [
         { cls: 'tk-operator', pattern: /#\{[^}\n]*\}/ },
     ]},
     { cls: 'tk-string', pattern: /'(?:\\.|[^'\\\n])*'/ },
@@ -631,7 +630,6 @@
     { cls: 'tk-operator', pattern: /=>|::|\.\.|&&|\|\||[+\-*/%&|^!<>=?]=?/ },
     { cls: 'tk-punct', pattern: /[{}[\]();,.:]/ },
   ];
-  G.rb = G.ruby;
 
   // ============================================================
   // Lua
@@ -695,6 +693,15 @@
   // YAML
   // ============================================================
   G.yaml = [
+    // Block scalars first: everything indented under `key: |` or `key: >` is
+    // literal text, so a `#` in there is content, not a comment. The `key:`
+    // prefix is a lookbehind so it still tokenizes as a key below.
+    // A blank line ends the run — nesting depth isn't knowable to a regex,
+    // and stopping early beats swallowing the rest of the document.
+    { cls: 'tk-string',
+      pattern: /(:[ \t]*)[|>][-+]?\d*[ \t]*(?:\n[ \t]+.*)*/,
+      lookbehind: true },
+
     // Strings before comments, else # inside "..." is eaten as a comment
     { cls: 'tk-string', pattern: /"(?:\\.|[^"\\\n])*"|'(?:''|[^'\n])*'/ },
     { cls: 'tk-comment', pattern: /#.*/ },
@@ -704,7 +711,6 @@
     { cls: 'tk-number', pattern: /-?\b\d+(?:\.\d+)?\b/ },
     { cls: 'tk-punct', pattern: /^---|\.\.\.|[{}[\],:|-]/m },
   ];
-  G.yml = G.yaml;
 
   // ============================================================
   // Markdown
@@ -736,7 +742,6 @@
     // Horizontal rule
     { cls: 'tk-punct',     pattern: /^[-*_]{3,}$/m },
   ];
-  G.md = G.markdown;
 
   // ============================================================
   // R
@@ -799,7 +804,6 @@
     { cls: 'tk-operator', pattern: /=~|!~|->|=>|<=>|&&|\|\||\.\.|[+\-*/%.!<>=]=?/ },
     { cls: 'tk-punct', pattern: /[{}[\]();,:]/ },
   ];
-  G.pl = G.perl;
 
   // ============================================================
   // PowerShell
@@ -831,9 +835,6 @@
     { cls: 'tk-operator', pattern: /\+\+|--|[+\-*/%!]=?|[<>]/ },
     { cls: 'tk-punct', pattern: /[{}[\]();,|=@]/ },
   ];
-  G.ps1 = G.powershell;
-  G.psm1 = G.powershell;
-  G.pwsh = G.powershell;
 
   // ============================================================
   // Elixir
@@ -847,7 +848,8 @@
   G.elixir = [
     { cls: 'tk-doc', pattern: /@(?:moduledoc|doc)\s+"""[\s\S]*?"""/ },
     // Strings before comments, else # inside "..." (incl. #{} interpolation) is eaten
-    { cls: 'tk-string', pattern: /"""[\s\S]*?"""|"(?:\\.|#\{[^}\n]*\}|[^"\\\n])*"/, inside: [
+    // Fallback and interpolation branch kept disjoint (see the JS template-string note).
+    { cls: 'tk-string', pattern: /"""[\s\S]*?"""|"(?:\\.|#\{[^}\n]*\}|#(?!\{)|[^"\\\n#])*"/, inside: [
         { cls: 'tk-operator', pattern: /#\{[^}\n]*\}/ },
     ]},
     { cls: 'tk-string', pattern: /'(?:\\.|[^'\\\n])*'/ },
@@ -863,8 +865,6 @@
     { cls: 'tk-operator', pattern: /\|>|<>|\+\+|--|=>|->|<-|::|&&|\|\||[+\-*/!<>=]=?|[&|^~]/ },
     { cls: 'tk-punct', pattern: /[{}[\]();,.%]/ },
   ];
-  G.ex = G.elixir;
-  G.exs = G.elixir;
 
   // ============================================================
   // Haskell
@@ -892,7 +892,6 @@
     { cls: 'tk-operator', pattern: /::|->|<-|=>|>>=|=<<|\+\+|&&|\|\||\$|[+\-*/^<>=!.]=?/ },
     { cls: 'tk-punct', pattern: /[{}[\]();,]/ },
   ];
-  G.hs = G.haskell;
 
   // ============================================================
   // GraphQL
@@ -909,7 +908,6 @@
     { cls: 'tk-number', pattern: RX.number },
     { cls: 'tk-punct', pattern: /[{}[\]():,=|!&]/ },
   ];
-  G.gql = G.graphql;
 
   // ============================================================
   // TOML / INI
@@ -936,9 +934,6 @@
     { cls: 'tk-number', pattern: /\b\d+(?:\.\d+)?\b/ },
     { cls: 'tk-operator', pattern: /[=:]/ },
   ];
-  G.properties = G.ini;
-  G.cfg = G.ini;
-  G.conf = G.ini;
 
   // ============================================================
   // Dockerfile
@@ -954,7 +949,6 @@
     { cls: 'tk-operator', pattern: /&&|\|\||[|>]/ },
     { cls: 'tk-punct', pattern: /[=[\],]/ },
   ];
-  G.docker = G.dockerfile;
 
   // ============================================================
   // Makefile
@@ -969,8 +963,6 @@
     { cls: 'tk-operator', pattern: /[:?+!]?=|&&|\|\||[|;]/ },
     { cls: 'tk-punct', pattern: /[():,]/ },
   ];
-  G.make = G.makefile;
-  G.mk = G.makefile;
 
   // ============================================================
   // Diff / patch · additions render mint (tk-function), deletions warm rose
@@ -983,7 +975,6 @@
     { cls: 'tk-function', pattern: /^\+.*/m },
     { cls: 'tk-property', pattern: /^-.*/m },
   ];
-  G.patch = G.diff;
 
   // ============================================================
   // 3. Language aliases + detection
@@ -1029,6 +1020,16 @@
     'cfg': 'ini',
     'conf': 'ini',
   };
+
+  // Every alias above becomes a lookup key too, so `JSRay.languages.rb` works
+  // as directly as `JSRay.languages.ruby`. This used to be 35 hand-written
+  // `G.rb = G.ruby` lines maintained beside the table, and the two had already
+  // drifted — `ts` pointed at javascript here while the table said typescript.
+  // Declaring an alias in one place is now the whole job.
+  for (const alias in LANGUAGE_ALIASES) {
+    const grammar = G[LANGUAGE_ALIASES[alias]];
+    if (grammar) G[alias] = grammar;
+  }
 
   function normalizeLanguage(lang) {
     const raw = String(lang || '')
@@ -1312,12 +1313,14 @@
   }
 
   // ============================================================
-  // 4. Public API
-  // ============================================================
-  // ============================================================
-  // Theme palette schema mapping
-  //   semantic key (tokens.json)  →  CSS variable suffix
-  // Keep this in sync with tools/generate-theme.mjs ALIAS.
+  // 4. Theme palette schema mapping
+  //      semantic key (tokens.json)  →  CSS variable suffix
+  //
+  // vocabulary.json is the single source for this mapping, but Core loads as
+  // a plain <script> with no build step and cannot read a JSON file at
+  // runtime, so the table is inlined here. It is not maintained by hand:
+  // tests/palettes.test.mjs asserts it equals vocabulary.json entry for
+  // entry, and CI fails on any drift. Add tokens there, then mirror them here.
   // ============================================================
   const THEME_ALIAS = {
     'keyword':              'keyword',
@@ -1382,12 +1385,15 @@
     }
   }
 
+  // ============================================================
+  // 5. Public API
+  // ============================================================
   const JSRay = {
     /**
      * Runtime version, for shell/core compatibility negotiation.
      * Must match version.json — tools/check-versions.mjs asserts it.
      */
-    version: '0.0.1-beta.2',
+    version: '0.0.1-beta.3',
     languages: G,
     normalizeLanguage,
     detectLanguage,
@@ -1457,7 +1463,7 @@
   };
 
   // ============================================================
-  // 5. Auto-init
+  // 6. Auto-init
   // ============================================================
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
