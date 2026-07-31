@@ -1,6 +1,6 @@
 {
   "project": "jsray",
-  "version": "0.0.1-beta.3",
+  "version": "0.0.1-beta.4",
   "description": "Machine-readable token vocabulary: the three-name lock-step every JSRay surface shares. A palette key maps to one CSS custom property (--jr-<suffix>) and one runtime class (tk-<suffix>).",
   "tokens": {
     "keyword": "keyword",
