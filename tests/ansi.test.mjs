@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, copyFileSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, copyFileSync, appendFileSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -176,4 +176,72 @@ test('a palette file with no usable theme is rejected outright', () => {
   writeFileSync(file, JSON.stringify({ themes: { solarized: {} } }));
   assert.throws(() => loadCustomPalette(file), /no usable dark or light theme/);
   assert.throws(() => loadCustomPalette('/nope/missing.json'), /not found/);
+});
+
+
+const CORE = createRequire(import.meta.url)(resolve(ROOT, 'vendor/jsray.cjs'));
+const VOCABULARY = JSON.parse(readFileSync(resolve(ROOT, 'vocabulary.json'), 'utf8'));
+const DOC_FILES = ['README.md', 'README.zh-CN.md'];
+
+test('documented counts match the bundled Core, not a remembered one', () => {
+  // Every number here was copied from Core's README at some point, and Core's
+  // numbers move: the identifier-family count read "six" against a table with
+  // nine rows for as long as nobody checked. The bundled snapshot is the only
+  // authority this repository has, so it is the one to check against.
+  const grammars = new Set(Object.values(CORE.languages)).size;
+  const tokens = Object.keys(VOCABULARY.tokens).length;
+
+  for (const file of DOC_FILES) {
+    const path = resolve(ROOT, file);
+    if (!existsSync(path)) continue;
+    const text = readFileSync(path, 'utf8');
+
+    for (const [claim, count, kind] of [...text.matchAll(/(\d+)\s*(language famil|token class|个 token|种语言)/gi)]
+        .map((m) => [m[0], Number(m[1]), m[2].toLowerCase()])) {
+      const expected = /language|种语言/.test(kind) ? grammars : tokens;
+      assert.equal(count, expected, `${file} claims "${claim}" but the bundled Core has ${expected}`);
+    }
+
+    // The identifier families are a Core concept the docs restate in prose.
+    assert.doesNotMatch(text, /\b(six|Six)[- ]family\b/, `${file} still says six-family`);
+    assert.doesNotMatch(text, /六[- ]?族/, `${file} still says 六族`);
+  }
+});
+
+test('every colour form a palette can carry converts to a real sequence', () => {
+  // The validator accepts what a palette actually contains, and a palette is
+  // not only hex: Core's own lineHighlight is rgba(), because a translucent
+  // overlay cannot be written any other way. A hex parser turned that into
+  // NaN, and `\x1b[38;2;NaN;NaN;NaNm` is not an error anywhere — it prints as
+  // garbage and carries on.
+  const palette = loadPalette('default');
+
+  for (const color of [
+    '#48484A', '#abc', 'rgb(20,20,24)', 'rgba(255,255,255,0.05)',
+    'rgb(50%,50%,50%)', 'hsl(280,80%,70%)', 'hsla(0,100%,50%,0.5)',
+    'transparent', 'not-a-color',
+  ]) {
+    const out = withLineNumbers('a\n', { ...palette.themes.dark, gutter: color }, 'truecolor');
+    assert.doesNotMatch(out, /NaN/, `${color} produced a NaN escape sequence`);
+    assert.match(out, /\x1b\[38;2;\d+;\d+;\d+m/, `${color} produced no colour at all`);
+  }
+});
+
+test("Core's own palettes survive validation intact", () => {
+  // The promise is that a palette authored once works on every JSRay surface.
+  // It did not: the same file kept lineHighlight in WordPress and lost it in
+  // the terminal and VS Code, because those two accepted hex alone.
+  const palette = loadPalette('default');
+
+  for (const mode of ['dark', 'light']) {
+    const surfaces = Object.keys(palette.themes[mode]).filter((k) => k !== 'tokens');
+    const { palette: validated } = mergePalettes(palette, palette);
+
+    for (const surface of surfaces) {
+      assert.ok(
+        validated ? validated.themes[mode][surface] !== undefined : true,
+        `${mode}.${surface} was dropped by validation`
+      );
+    }
+  }
 });

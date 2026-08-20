@@ -8,8 +8,13 @@ the renderer itself belong in [JSRay Core](https://github.com/JSRayCore/JSRay).
 1. Fork and clone
 2. `npm link` exposes `jsray` on your PATH
 3. Exercise it against real files, stdin, and a pipe: `jsray x.py`, `cat x.sql | jsray`, `jsray x.js | head -1`
-4. Run the tests: `npm test` (requires Node ≥ 18)
-5. Run `npm run check:versions` before opening a PR
+4. Run the tests: `npm test` (requires Node ≥ 20)
+5. Run `npm run check:versions` and `npm run check:core` before opening a PR.
+   The second asks npm whether the bundled Core snapshot is still the published
+   one — the older drift check compares against a sibling checkout and skips
+   when Core is absent, which is every CI run, so a stale engine used to pass a
+   green build. It did: a denial of service fixed in Core sat in this bundle
+   until somebody measured it.
 
 ## Do not edit synced files
 

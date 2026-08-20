@@ -8,8 +8,8 @@
 **English** · [简体中文](README.zh-CN.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.0.1--internal.1-lightgrey)](CHANGELOG.md)
-[![Channel](https://img.shields.io/badge/channel-internal%20test-lightgrey)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.1--beta.1-lightgrey)](CHANGELOG.md)
+[![Channel](https://img.shields.io/badge/channel-beta-blue)](CHANGELOG.md)
 [![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/JSRayCore/JSRay)
 [![Node](https://img.shields.io/badge/node-%E2%89%A5%2018-339933)](package.json)
 
@@ -25,7 +25,7 @@ It **bundles a snapshot** of Core (`vendor/jsray.cjs`) rather than depending on 
 
 ## What it does
 
-`jsray` renders code in the terminal with ANSI colors, powered by the **same tokenizer and the same palettes** as every other JSRay surface: `JSRay.tokenize()` produces a renderer-agnostic token stream, and this project maps it to ANSI escape sequences instead of HTML spans. Six-family separation included — parameters italic amber, declarations bold mint, keywords bold.
+`jsray` renders code in the terminal with ANSI colors, powered by the **same tokenizer and the same palettes** as every other JSRay surface: `JSRay.tokenize()` produces a renderer-agnostic token stream, and this project maps it to ANSI escape sequences instead of HTML spans. Nine-family separation included — parameters italic amber, declarations bold mint, keywords bold.
 
 - **35 language families** (everything Core supports), auto-detected from the file extension, filename (`Dockerfile`, `Makefile`), or content
 - **4 palettes × dark/light**: default, aurora, ember, fjord
@@ -49,7 +49,7 @@ Language resolution order: `--lang` → file extension → special filenames →
 
 Color resolution: `--color auto` (default) uses truecolor when `COLORTERM` advertises it, xterm-256 otherwise, and plain text when stdout is not a TTY. Override with `--color truecolor|256|none`.
 
-## Install (internal test)
+## Install
 
 ```sh
 npm link          # from the repository root; exposes `jsray` on PATH

@@ -8,8 +8,8 @@
 [English](README.md) · **简体中文**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.0.1--internal.1-lightgrey)](CHANGELOG.md)
-[![Channel](https://img.shields.io/badge/channel-internal%20test-lightgrey)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.1--beta.1-lightgrey)](CHANGELOG.md)
+[![Channel](https://img.shields.io/badge/channel-beta-blue)](CHANGELOG.md)
 [![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/JSRayCore/JSRay)
 [![Node](https://img.shields.io/badge/node-%E2%89%A5%2018-339933)](package.json)
 
@@ -25,7 +25,7 @@
 
 ## 功能
 
-`jsray` 用 ANSI 颜色在终端里渲染代码,背后是与其它所有 JSRay 表面**完全相同的分词器和调色板**:`JSRay.tokenize()` 产出与渲染器无关的 token 流,本项目把它映射为 ANSI 转义序列,而不是 HTML span。六族分离同样保留——参数斜体琥珀,声明加粗薄荷,关键字加粗。
+`jsray` 用 ANSI 颜色在终端里渲染代码,背后是与其它所有 JSRay 表面**完全相同的分词器和调色板**:`JSRay.tokenize()` 产出与渲染器无关的 token 流,本项目把它映射为 ANSI 转义序列,而不是 HTML span。九族分离同样保留——参数斜体琥珀,声明加粗薄荷,关键字加粗。
 
 - **35 个语言族**(Core 支持的全部),依据文件扩展名、特殊文件名(`Dockerfile`、`Makefile`)或内容自动识别
 - **4 款调色板 × 明暗两态**:default、aurora、ember、fjord
@@ -49,7 +49,7 @@ jsray --list-themes
 
 颜色判定:`--color auto`(默认)在 `COLORTERM` 宣告真彩时使用 truecolor,否则使用 xterm-256;当 stdout 不是 TTY 时输出纯文本。可用 `--color truecolor|256|none` 覆盖。
 
-## 安装(内部测试)
+## 安装
 
 ```sh
 npm link          # 在仓库根目录执行,把 `jsray` 挂到 PATH 上

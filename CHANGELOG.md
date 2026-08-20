@@ -9,16 +9,21 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.0.1-beta.1] — 2026-08-01
+
+First public beta. The CLI vendors a JSRay Core snapshot rather than depending
+on it, so `jsray` is one self-contained package whose engine can be verified
+against the digests Core published.
+
 ### Added
-- `--verify-core`: checks the bundled engine and palettes against the digests JSRay Core published for the snapshot. Verification also runs on every invocation, warning on stderr so a pipeline is never affected.
-- `--palette <file.json>`: layer a custom palette over any built-in theme, using the same JSON the Theme Studio exports. Keys are validated against the bundled vocabulary; unknown ones are reported and skipped so palettes stay portable across Core versions.
+- `--verify-core` checks the bundled engine and palettes against those digests. Verification also runs on every invocation, warning on stderr rather than stdout so a pipeline is never affected by it.
+- `--palette <file.json>` layers a custom palette over any built-in theme, using the same JSON the Theme Studio exports. Keys are validated against the bundled vocabulary; unknown ones are reported and skipped, so a palette written for a newer Core still works.
 
 ### Changed
-- The tk-class → palette-key map is derived from Core's `vocabulary.json` instead of transcribed here. A transcription is how a Core that grows a token ends up silently unstyled in the terminal.
-
-### Changed
-- Bundled Core snapshot advanced to **0.0.1-beta.1** (Core's first public beta).
-- Repository documentation aligned with Core: CHANGELOG, CONTRIBUTING, SECURITY, and Code of Conduct now match the ecosystem baseline, and the README carries the shared brand header and a Simplified Chinese translation.
+- The tk-class → palette-key map is derived from Core's `vocabulary.json` rather than transcribed here. A transcription is how a Core that grows a token ends up silently unstyled in the terminal.
+- Bundled Core is **0.0.1-beta.4**, which fixes a denial of service present in every earlier snapshot: an unterminated interpolating string sent four grammars into exponential backtracking. A CLI reading a half-written file from a pipe is exactly the shape that triggers it. Measured here, 8001 characters of unterminated template string render in 4ms.
+- CI fails when the bundled Core is behind the published Core, and a scheduled workflow opens a sync pull request when Core moves. The previous drift check compared against a sibling checkout and skipped silently when Core was absent — every CI run.
+- Repository documentation matches the ecosystem baseline: CHANGELOG, CONTRIBUTING, SECURITY and Code of Conduct, with the shared brand header and a Simplified Chinese README.
 
 ## [0.0.1-internal.1] — 2026-07-12
 

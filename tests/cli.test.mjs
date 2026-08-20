@@ -94,3 +94,92 @@ test('early-closing downstream pipe does not crash (EPIPE)', () => {
   );
   assert.match(out, /rc=0/);
 });
+
+test('an unreadable file is one line of explanation, not a stack trace', () => {
+  // Every other error this CLI produces is a single line — a bad theme name, a
+  // missing palette file, an unknown flag. The input path was the one that
+  // answered with Node's own trace, naming internal fs paths at the reader.
+  const fails = (args) => {
+    try {
+      execFileSync('node', [BIN, ...args], { encoding: 'utf8', stdio: 'pipe' });
+      return null;
+    } catch (error) {
+      return { status: error.status, stderr: error.stderr || '' };
+    }
+  };
+
+  const missing = fails(['/nonexistent-jsray-test.js']);
+  assert.ok(missing, 'a missing file should exit non-zero');
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /no such file: \/nonexistent-jsray-test\.js/);
+  assert.doesNotMatch(missing.stderr, /node:fs|at readFileSync/,
+    'the error still leaks a stack trace');
+
+  const dir = fails(['/etc']);
+  assert.ok(dir, 'a directory should exit non-zero');
+  assert.match(dir.stderr, /is a directory, not a file/);
+});
+
+test('line numbers count lines, not newlines', () => {
+  // A file ending in a newline splits into a final empty string that marks the
+  // position after the last line rather than a line of its own. Numbering it
+  // reported one more line than the file has, and one more than `cat -n`.
+  const two = run(['-l', 'js', '-n', '--color', 'none'], 'a\nb\n');
+  assert.equal(two.replace(/\n$/, '').split('\n').length, 2,
+    `two lines of input produced: ${JSON.stringify(two)}`);
+  assert.match(two, /1 │ a\n2 │ b/);
+  assert.doesNotMatch(two, /3 │/);
+
+  const noEol = run(['-l', 'js', '-n', '--color', 'none'], 'a\nb');
+  assert.match(noEol, /1 │ a\n2 │ b/);
+  assert.doesNotMatch(noEol, /3 │/);
+
+  // Ten lines cross the padding-width boundary.
+  const ten = run(['-l', 'js', '-n', '--color', 'none'], 'x\n'.repeat(10));
+  assert.match(ten, /10 │ x/);
+  assert.doesNotMatch(ten, /11 │/);
+});
+
+test('--line-range takes a window onto the file', () => {
+  const five = 'one\ntwo\nthree\nfour\nfive\n';
+
+  assert.equal(run(['-l', 'js', '-r', '2:4', '--color', 'none'], five), 'two\nthree\nfour\n');
+  assert.equal(run(['-l', 'js', '-r', '4:', '--color', 'none'], five), 'four\nfive\n');
+  assert.equal(run(['-l', 'js', '-r', ':2', '--color', 'none'], five), 'one\ntwo\n');
+  assert.equal(run(['-l', 'js', '-r', '3', '--color', 'none'], five), 'three\n');
+
+  // A range past the end selects nothing. Clamping the start instead would
+  // hand back the last line — a confident answer to a question the file
+  // cannot answer.
+  assert.equal(run(['-l', 'js', '-r', '9:99', '--color', 'none'], five), '\n');
+
+  // Numbers count from the file, not from the slice: a range is a window, and
+  // renumbering from 1 would misreport where the code lives.
+  assert.match(run(['-l', 'js', '-r', '2:3', '-n', '--color', 'none'], five), /2 │ two\n3 │ three/);
+});
+
+test('a slice of a multi-line token keeps its color', () => {
+  // Tokens span lines — block comments, template literals — and the renderer
+  // used to open a colour once, leaving continuation lines bare. Any slice
+  // then produced a plain line where the file had a coloured one.
+  const middle = run(['-l', 'js', '-r', '2:2', '--color', '256'], '/* a\n   b\n   c */\n');
+  assert.match(middle, /^\x1b\[/, `the sliced line carries no style: ${JSON.stringify(middle)}`);
+  assert.match(middle, /b/);
+});
+
+test('several files are labelled; one file is not', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'jsray-multi-'));
+  const a = join(dir, 'a.js');
+  const b = join(dir, 'b.py');
+  writeFileSync(a, 'const a = 1;\n');
+  writeFileSync(b, 'def f():\n    pass\n');
+
+  const both = run([a, b, '--color', 'none']);
+  assert.ok(both.includes(`── ${a}`), `no header for ${a}: ${JSON.stringify(both)}`);
+  assert.ok(both.includes(`── ${b}`), `no header for ${b}`);
+  assert.match(both, /const a = 1;/);
+  assert.match(both, /def f\(\):/);
+
+  // A lone file is the common case and should look untouched.
+  assert.equal(run([a, '--color', 'none']), 'const a = 1;\n');
+});

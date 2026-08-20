@@ -49,10 +49,11 @@ const FILENAME_LANG = {
 const HELP = `jsray ${VERSION} · JSRay code rendering for the terminal
 
 Usage:
-  jsray [file] [options]        highlight a file, or stdin when no file / "-"
+  jsray [file...] [options]     highlight files, or stdin when none / "-"
 
 Options:
   -l, --lang <id>               language (default: from filename, else auto-detect)
+  -r, --line-range <N:M>        only lines N through M (N: to end, :M from start)
   -t, --theme <name>            palette: ${listPalettes().join(', ')} (default: default)
   -m, --mode <dark|light>       theme variant (default: dark)
   -n, --line-numbers            show line numbers
@@ -69,7 +70,7 @@ Options:
 `;
 
 function parseArgs(argv) {
-  const opts = { file: null, lang: '', theme: 'default', mode: 'dark', color: 'auto', lineNumbers: false, palette: '' };
+  const opts = { files: [], lang: '', theme: 'default', mode: 'dark', color: 'auto', lineNumbers: false, palette: '', range: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {
@@ -81,13 +82,13 @@ function parseArgs(argv) {
       case '--list-languages': opts.listLanguages = true; break;
       case '--list-themes': opts.listThemes = true; break;
       case '--palette': opts.palette = argv[++i] || ''; break;
+      case '-r': case '--line-range': opts.range = argv[++i] || ''; break;
       case '--verify-core': opts.verifyCore = true; break;
       case '-h': case '--help': opts.help = true; break;
       case '-v': case '--version': opts.showVersion = true; break;
       default:
         if (a.startsWith('-') && a !== '-') fail(`unknown option: ${a}\n\n${HELP}`);
-        if (opts.file !== null) fail('only one input file is supported');
-        opts.file = a;
+        opts.files.push(a);
     }
   }
   return opts;
@@ -96,6 +97,62 @@ function parseArgs(argv) {
 function fail(msg) {
   process.stderr.write(msg.endsWith('\n') ? msg : msg + '\n');
   process.exit(1);
+}
+
+/**
+ * Parse `-r 10:20`, `-r 5:` (to the end) or `-r :20` (from the start).
+ *
+ * Returns null when no range was asked for, so the caller can tell "print
+ * everything" from "print nothing".
+ */
+function parseRange(spec) {
+  if (!spec) return null;
+
+  const match = /^(\d*):(\d*)$/.exec(spec.trim()) || /^(\d+)$/.exec(spec.trim());
+  if (!match) fail(`invalid --line-range: ${spec} (use N:M, N:, :M or N)`);
+
+  const start = match[1] ? Number(match[1]) : 1;
+  const end = match[2] === undefined ? start : (match[2] ? Number(match[2]) : Infinity);
+
+  if (start < 1) fail('--line-range starts at line 1');
+  if (end < start) fail(`--line-range ${spec} ends before it starts`);
+
+  return { start, end };
+}
+
+/**
+ * Take a line range out of already-rendered output.
+ *
+ * Line numbers keep counting from the file, not from the slice — a range is a
+ * window onto a file, and renumbering it from 1 would misreport where the code
+ * actually lives.
+ */
+function sliceLines(text, range, showNumbers) {
+  const trailing = text.endsWith('\n');
+  const lines = (trailing ? text.slice(0, -1) : text).split('\n');
+
+  // A range that starts past the end selects nothing. Clamping the start the
+  // way the end is clamped would instead hand back the last line, which is a
+  // confident answer to a question the file cannot answer.
+  if (range.start > lines.length) return '';
+
+  const from = range.start;
+  const to = Math.min(range.end === Infinity ? lines.length : range.end, lines.length);
+  const picked = lines.slice(from - 1, to);
+
+  if (!showNumbers) return picked.join('\n') + (trailing ? '\n' : '');
+
+  const width = String(to).length;
+  return picked
+    .map((line, i) => `${String(from + i).padStart(width)} │ ${line}`)
+    .join('\n') + (trailing ? '\n' : '');
+}
+
+/** The gutter color sequence, reused for the multi-file header rule. */
+function gutterOpen(themeBlock, colorMode) {
+  const probe = withLineNumbers('x', themeBlock, colorMode);
+  const match = /^(\x1b\[[0-9;]*m)+/.exec(probe);
+  return match ? match[0] : '';
 }
 
 function resolveColorMode(requested) {
@@ -122,7 +179,19 @@ function languageFor(file, code, explicit) {
 }
 
 function readInput(file) {
-  if (file && file !== '-') return readFileSync(file, 'utf8');
+  if (file && file !== '-') {
+    // The stdin branch below has always caught its own failures; this one did
+    // not, so a mistyped path answered with a Node stack trace naming
+    // internal fs paths. Every other error this CLI can produce is one line.
+    try {
+      return readFileSync(file, 'utf8');
+    } catch (error) {
+      if (error.code === 'ENOENT') fail(`no such file: ${file}`);
+      if (error.code === 'EISDIR') fail(`${file} is a directory, not a file`);
+      if (error.code === 'EACCES') fail(`cannot read ${file}: permission denied`);
+      fail(`cannot read ${file}: ${error.message}`);
+    }
+  }
   // Bare `jsray` in an interactive terminal would block forever waiting for
   // stdin EOF and look like "nothing happens" — show help instead.
   if (process.stdin.isTTY && file !== '-') {
@@ -179,9 +248,7 @@ if (opts.listLanguages) {
 
 if (!['dark', 'light'].includes(opts.mode)) fail(`invalid --mode: ${opts.mode} (dark|light)`);
 
-const code = readInput(opts.file);
 const colorMode = resolveColorMode(opts.color);
-const lang = languageFor(opts.file, code, opts.lang);
 
 let palette;
 try {
@@ -196,11 +263,35 @@ try {
   fail(err.message);
 }
 const themeBlock = palette.themes[opts.mode];
-
-// Unknown/undetected language degrades to plain text — never an error.
-const stream = lang && JSRay.languages[lang] ? JSRay.tokenize(code, lang) : [code];
 const styles = colorMode === 'none' ? null : buildStyles(themeBlock, colorMode);
-let output = renderStream(stream, styles);
-if (opts.lineNumbers) output = withLineNumbers(output, themeBlock, colorMode);
+const range = parseRange(opts.range);
 
-process.stdout.write(output.endsWith('\n') ? output : output + '\n');
+// No file argument means stdin, which is one input rather than none.
+const inputs = opts.files.length ? opts.files : [null];
+
+inputs.forEach((file, index) => {
+  const code = readInput(file);
+  const lang = languageFor(file, code, opts.lang);
+
+  // Unknown/undetected language degrades to plain text — never an error.
+  const stream = lang && JSRay.languages[lang] ? JSRay.tokenize(code, lang) : [code];
+  let output = renderStream(stream, styles);
+
+  // Slicing happens after rendering, not before: a range starting inside a
+  // block comment or a template literal still gets that token's colour,
+  // because the whole file was tokenized. renderStream re-opens the active
+  // style on every line, which is what makes a slice safe to take.
+  if (range) output = sliceLines(output, range, opts.lineNumbers);
+  else if (opts.lineNumbers) output = withLineNumbers(output, themeBlock, colorMode);
+
+  // A header only earns its line when there is more than one file to tell
+  // apart; a single file is the common case and should look untouched.
+  if (inputs.length > 1) {
+    const label = file === null || file === '-' ? '(stdin)' : file;
+    const rule = colorMode === 'none' ? '' : gutterOpen(themeBlock, colorMode);
+    const reset = colorMode === 'none' ? '' : '\x1b[0m';
+    process.stdout.write(`${index ? '\n' : ''}${rule}── ${label}${reset}\n`);
+  }
+
+  process.stdout.write(output.endsWith('\n') ? output : output + '\n');
+});

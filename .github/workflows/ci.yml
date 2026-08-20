@@ -8,13 +8,28 @@ on:
 permissions:
   contents: read
 
+# A branch only needs its newest commit checked.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Test on Node ${{ matrix.node }}
     runs-on: ubuntu-latest
+    # This repository bundles a copy of the JSRay rendering engine, and an
+    # engine that hangs is a failure mode the ecosystem has actually shipped:
+    # before Core 0.0.1-beta.3 an unterminated string could hold it for
+    # minutes. Without a limit that becomes a six-hour runner and the signal
+    # arrives as a billing surprise rather than a red check.
+    timeout-minutes: 10
     strategy:
+      # One Node version failing should not hide whether the others pass.
+      fail-fast: false
       matrix:
-        node: ['18', '20', '22']
+        # In step with package.json engines.node. 18 left when it went
+        # end-of-life; nothing here needed it to stay.
+        node: ['20', '22', '24']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

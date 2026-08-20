@@ -1,9 +1,9 @@
 {
   "project": "jsray-terminal",
   "name": "JSRay Terminal",
-  "version": "0.0.1-internal.1",
-  "channel": "internal",
-  "publicBetaReleased": false,
+  "version": "0.0.1-beta.1",
+  "channel": "beta",
+  "publicBetaReleased": true,
   "nextPublicBeta": "0.0.1-beta.1",
   "bundledCore": {
     "project": "jsray",
