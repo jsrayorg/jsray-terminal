@@ -78,7 +78,12 @@
   const RX = {
     string1: /"(?:\\.|[^"\\\n])*"/,
     string2: /'(?:\\.|[^'\\\n])*'/,
-    number:  /\b(?:0[xX][\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)\b/,
+    // The trailing `n` marks a BigInt and belongs to the literal. It sits
+    // inside the match rather than after `\b`, because `10n` is one word to
+    // the boundary check — `\b` falls between `n` and whatever follows, so a
+    // pattern ending at `\b` matched nothing at all here rather than matching
+    // the digits alone.
+    number:  /\b(?:0[xX][\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)n?\b/,
     ident:   /[A-Za-z_$][\w$]*/,
   };
 
@@ -90,7 +95,7 @@
     'else enum export extends finally for from function get if implements import in ' +
     'instanceof interface let namespace new of package private protected public readonly ' +
     'return satisfies set static super switch this throw try type typeof var void while ' +
-    'with yield declare abstract is keyof infer'
+    'with yield declare abstract is keyof infer accessor override asserts using'
   ).split(' ');
 
   const JS_BUILTINS = (
@@ -231,6 +236,19 @@
     // Triple-quoted strings (with f/r/b prefixes). All strings before
     // comments so # inside "..." never becomes a comment.
     { cls: 'tk-string',  pattern: /(?:[rRbBuUfF]{0,2})("""[\s\S]*?"""|'''[\s\S]*?''')/ },
+    // PEP 701 lets a replacement field carry the same quote that delimits the
+    // string: `f"{a["k"]}"` is valid from Python 3.12. The general rule below
+    // stops at the first inner quote, which split one string into two tokens
+    // and left the key bare between them.
+    //
+    // The field is matched as a unit so its quotes are consumed with it. The
+    // three alternatives begin with different characters — `{`, `\`, and a
+    // class excluding both — so any input has exactly one way to match and the
+    // pattern cannot backtrack. A nested brace (a format spec such as `:>{w}`)
+    // is deliberately left to fall through to the general rule: covering it
+    // needs a nested quantifier, which is the ambiguous shape that caused the
+    // beta.4 denial of service.
+    { cls: 'tk-string',  pattern: /(?:[rRbB][fF]|[fF][rRbB]?)("(?:\{[^{}]*\}|\\.|[^"\\\n{])*"|'(?:\{[^{}]*\}|\\.|[^'\\\n{])*')/ },
     { cls: 'tk-string',  pattern: /(?:[rRbBuUfF]{0,2})("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')/ },
     { cls: 'tk-comment', pattern: /#.*/ },
 
@@ -403,7 +421,7 @@
     'endwhile eval exit extends final finally fn for foreach function global goto if ' +
     'implements include include_once instanceof insteadof interface isset list match ' +
     'namespace new or print private protected public readonly require require_once return ' +
-    'static switch throw trait try unset use var while xor yield'
+    'static switch throw trait try unset use var while xor yield enum'
   ).split(' ');
 
   const PHP_BUILTIN_FNS = (
@@ -459,14 +477,25 @@
       { cls: 'tk-string', pattern: /'(?:\\.|[^'\\\n])*'/ },
       { cls: 'tk-comment', pattern: /\/\/.*/ },
       { cls: 'tk-var-const', pattern: /\b[A-Z][A-Z0-9_]{2,}\b/ },
-      { cls: 'tk-type', pattern: /(\b(?:class|struct|interface|enum|trait|extends|implements|namespace|using|new|object|protocol|extension|mixin)\s+)[A-Za-z_]\w*/, lookbehind: true },
+      { cls: 'tk-type', pattern: /(\b(?:class|struct|interface|enum|trait|extends|implements|namespace|using|new|object|protocol|extension|mixin|record|actor)\s+)[A-Za-z_]\w*/, lookbehind: true },
       { cls: 'tk-fn-decl', pattern: new RegExp('\\b(?!(?:' + CLIKE_DECL_SKIP + ')\\b)[A-Za-z_]\\w*(?=\\s*\\([^;{}]*\\)\\s*(?:const\\s*)?(?:->\\s*[A-Za-z_:][\\w:<>]*)?\\{)') },
       { cls: 'tk-keyword', pattern: wordPattern(keywords) },
       { cls: 'tk-keyword', pattern: /\b(?:true|false|null|nullptr|nil|None)\b/ },
       { cls: 'tk-fn-builtin', pattern: wordPattern(builtins.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))) },
       { cls: 'tk-property', pattern: /(\.|::|->)[A-Za-z_]\w*/, lookbehind: true },
       { cls: 'tk-function', pattern: /\b[A-Za-z_]\w*(?=\s*\()/ },
-      { cls: 'tk-number', pattern: /\b(?:0[xX][\da-fA-F_]+|0[bB][01_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?[fFdDuUlL]*)\b/ },
+      // A type suffix is part of the literal, and a literal that ends in one
+      // the pattern does not know produced no token at all rather than the
+      // digits alone — `\b` sits between `0` and `i`, not after `1_000`. Java's
+      // `L` was covered and Rust's `i64`, Go's `i` and C#'s `m` were not.
+      //
+      // Rust's word-shaped suffixes are listed before the single-letter class
+      // so `i64` is taken whole instead of `i` leaving `64` behind.
+      //
+      // The hexadecimal branch admits a binary exponent (`0x1p3`) but only with
+      // the `p` present, which C and C++ require anyway. Without that guard the
+      // optional fraction would swallow the dot in Rust's `0xff.count_ones()`.
+      { cls: 'tk-number', pattern: /\b(?:0[xX][\da-fA-F_]*(?:\.[\da-fA-F_]*)?[pP][+-]?\d+|0[xX][\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)(?:[iu](?:8|16|32|64|128|size)|f(?:32|64)|[fFdDuUlLmMi]*)\b/ },
       { cls: 'tk-operator', pattern: /::|->|=>|\.\.|<<=?|>>>?=?|<=|>=|==|!=|&&|\|\||\+\+|--|[+\-*/%&|^~!<>=?]=?/ },
       { cls: 'tk-punct', pattern: /[{}[\]();,.:]/ },
     ];
@@ -475,6 +504,76 @@
       // Insert before the literal-keyword rule (index-independent).
       const at = rules.findIndex((r) => r.pattern.source.includes('nullptr'));
       rules.splice(at, 0, { cls: 'tk-fn-builtin', pattern: /\b[A-Za-z_]\w*!/ });
+    }
+
+    // Go's raw string literals run to the next backtick, cross newlines, and
+    // recognise no escapes whatsoever. No other C-like language in this set
+    // gives the character a meaning, and a negated class cannot backtrack, so
+    // the rule is both safe and self-contained.
+    if (opts.rawBacktick) {
+      rules.splice(rules.findIndex((r) => r.cls === 'tk-string'), 0, {
+        cls: 'tk-string',
+        pattern: /`[^`]*`/,
+      });
+    }
+
+    // C++ and Rust raw strings exist so a literal can hold quotes, which is
+    // precisely what defeats the general rule: `R"(a "b" c)"` closed at the
+    // inner quote, split into two strings, and left `b` bare between them —
+    // the same failure as a triple-quoted block, in the one syntax whose
+    // entire purpose is to contain the character that causes it.
+    //
+    // Both languages balance the delimiter with a count the author chooses:
+    // C++ names it (`R"tag(…)tag"`), Rust counts hashes (`r##"…"##`). The
+    // backreference matches only the same count that opened, so `"#` inside an
+    // `r##` literal does not close it. Backreferences cannot be nested here,
+    // and the lazy body is bounded by a literal terminator, so neither form
+    // opens a backtracking path.
+    if (opts.rawDelimited === 'cpp') {
+      rules.splice(rules.findIndex((r) => r.cls === 'tk-string'), 0, {
+        cls: 'tk-string',
+        pattern: /\b(?:[uU]8?|[LU])?R"([^\s()\\]{0,16})\([\s\S]*?\)\1"/,
+      });
+    }
+
+    if (opts.rawDelimited === 'rust') {
+      rules.splice(rules.findIndex((r) => r.cls === 'tk-string'), 0, {
+        cls: 'tk-string',
+        pattern: /\b(?:b?r)(#{0,16})"[\s\S]*?"\1/,
+      });
+    }
+
+    // Java text blocks, Kotlin and Scala raw strings, Swift multiline literals,
+    // C# raw strings and Dart's triple-quoted form all open with three quotes.
+    // The rule has to precede the single-line form: `"""` begins with `""`, so
+    // the general rule matched an empty string there and left the third quote
+    // and the entire body outside any token, splitting the block into debris.
+    if (opts.tripleQuote) {
+      rules.splice(rules.findIndex((r) => r.cls === 'tk-string'), 0, {
+        cls: 'tk-string',
+        pattern: /"""[\s\S]*?"""|'''[\s\S]*?'''/,
+      });
+    }
+
+    // In Rust `'a` is a lifetime, not the start of a character literal. The
+    // shared single-quote rule scans forward to the next apostrophe, so a
+    // signature carrying two of them — `<'a> { s: &'a str }` — painted
+    // everything in between as one string, swallowing real code.
+    //
+    // Both forms are spelled out and the greedy rule is REPLACED rather than
+    // preceded: leaving it in place would keep one pattern around that can
+    // still span from any apostrophe to any later one.
+    if (opts.lifetimes) {
+      const at = rules.findIndex((r) => r.cls === 'tk-string' && r.pattern.source[0] === "'");
+      rules.splice(
+        at,
+        1,
+        // Exactly one character or one escape, then the closing quote.
+        { cls: 'tk-string', pattern: /'(?:\\(?:u\{[\da-fA-F]{1,6}\}|.)|[^'\\\n])'/ },
+        // A lifetime occupies the slot a type parameter occupies, so it is
+        // typed as one — JSRay's vocabulary has no separate lifetime class.
+        { cls: 'tk-type', pattern: /'[A-Za-z_]\w*\b/ }
+      );
     }
 
     // Languages whose declarations don't always end in `(...) {` (e.g. Scala's
@@ -504,19 +603,21 @@
     'else enum explicit export extern false float for friend if inline int long mutable ' +
     'namespace new noexcept nullptr operator private protected public register reinterpret_cast ' +
     'requires return short signed sizeof static static_cast struct switch template this throw ' +
-    'true try typedef typeid typename union unsigned using virtual void volatile while'
+    'true try typedef typeid typename union unsigned using virtual void volatile while ' +
+    'co_await co_yield co_return'
   ).split(' ');
   const CPP_BUILTINS = 'std cout cin cerr endl printf scanf malloc free make_unique make_shared move forward'.split(' ');
-  G.cpp = cLikeGrammar(CPP_KEYWORDS, CPP_BUILTINS);
+  G.cpp = cLikeGrammar(CPP_KEYWORDS, CPP_BUILTINS, { rawDelimited: 'cpp' });
 
   const JAVA_KEYWORDS = (
     'abstract assert boolean break byte case catch char class const continue default do double ' +
     'else enum exports extends final finally float for if implements import instanceof int ' +
     'interface long module native new package private protected public requires return short ' +
-    'static strictfp super switch synchronized this throw throws transient try var void volatile while'
+    'static strictfp super switch synchronized this throw throws transient try var void volatile while ' +
+    'record sealed permits yield'
   ).split(' ');
   const JAVA_BUILTINS = 'System String Integer Long Double Float Boolean Math Objects Arrays Collections List Map Set Optional println print'.split(' ');
-  G.java = cLikeGrammar(JAVA_KEYWORDS, JAVA_BUILTINS);
+  G.java = cLikeGrammar(JAVA_KEYWORDS, JAVA_BUILTINS, { tripleQuote: true });
 
   const CS_KEYWORDS = (
     'abstract as base bool break byte case catch char checked class const continue decimal default ' +
@@ -524,34 +625,34 @@
     'goto if implicit in int interface internal is lock long namespace new null object operator ' +
     'out override params private protected public readonly ref return sbyte sealed short sizeof ' +
     'stackalloc static string struct switch this throw true try typeof uint ulong unchecked unsafe ' +
-    'ushort using virtual void volatile while var async await record'
+    'ushort using virtual void volatile while var async await record init required nint nuint'
   ).split(' ');
   const CS_BUILTINS = 'Console WriteLine Write ReadLine Math List Dictionary IEnumerable Task string int bool var'.split(' ');
-  G.csharp = cLikeGrammar(CS_KEYWORDS, CS_BUILTINS);
+  G.csharp = cLikeGrammar(CS_KEYWORDS, CS_BUILTINS, { tripleQuote: true });
 
   const GO_KEYWORDS = (
     'break default func interface select case defer go map struct chan else goto package switch ' +
-    'const fallthrough if range type continue for import return var'
+    'const fallthrough if range type continue for import return var any'
   ).split(' ');
   const GO_BUILTINS = 'append cap close complex copy delete imag len make new panic print println real recover fmt'.split(' ');
-  G.go = cLikeGrammar(GO_KEYWORDS, GO_BUILTINS);
+  G.go = cLikeGrammar(GO_KEYWORDS, GO_BUILTINS, { rawBacktick: true });
 
   const RUST_KEYWORDS = (
     'as async await break const continue crate dyn else enum extern false fn for if impl in let ' +
     'loop match mod move mut pub ref return self Self static struct super trait true type unsafe ' +
-    'use where while'
+    'use where while union'
   ).split(' ');
   const RUST_BUILTINS = 'println format vec panic assert assert_eq Some None Ok Err Result Option String Vec Box'.split(' ');
-  G.rust = cLikeGrammar(RUST_KEYWORDS, RUST_BUILTINS, { rustMacros: true });
+  G.rust = cLikeGrammar(RUST_KEYWORDS, RUST_BUILTINS, { rustMacros: true, lifetimes: true, rawDelimited: 'rust' });
 
   const SWIFT_KEYWORDS = (
     'associatedtype async await break case catch class continue default defer deinit do else enum ' +
     'extension fallthrough false fileprivate final for func guard if import in init inout internal ' +
     'is let nil open operator private protocol public repeat rethrows return self Self static struct ' +
-    'subscript super switch throw throws true try typealias var where while'
+    'subscript super switch throw throws true try typealias var where while actor some'
   ).split(' ');
   const SWIFT_BUILTINS = 'print debugPrint assert precondition fatalError String Int Double Float Bool Array Dictionary Set Optional'.split(' ');
-  G.swift = cLikeGrammar(SWIFT_KEYWORDS, SWIFT_BUILTINS);
+  G.swift = cLikeGrammar(SWIFT_KEYWORDS, SWIFT_BUILTINS, { tripleQuote: true });
 
   const KOTLIN_KEYWORDS = (
     'as break class continue do else false for fun if in interface is null object package return ' +
@@ -561,7 +662,7 @@
     'lateinit noinline open operator out override private protected public reified sealed suspend tailrec vararg'
   ).split(' ');
   const KOTLIN_BUILTINS = 'println print arrayOf listOf mutableListOf mapOf setOf sequenceOf require check error String Int Long Double Float Boolean Unit Any Nothing'.split(' ');
-  G.kotlin = cLikeGrammar(KOTLIN_KEYWORDS, KOTLIN_BUILTINS);
+  G.kotlin = cLikeGrammar(KOTLIN_KEYWORDS, KOTLIN_BUILTINS, { tripleQuote: true });
 
   const DART_KEYWORDS = (
     'abstract as assert async await break case catch class const continue covariant default deferred ' +
@@ -570,7 +671,7 @@
     'rethrow return set show static super switch sync this throw true try typedef var void while with yield'
   ).split(' ');
   const DART_BUILTINS = 'print assert identical main String int double num bool List Map Set Future Stream Iterable Widget StatelessWidget StatefulWidget'.split(' ');
-  G.dart = cLikeGrammar(DART_KEYWORDS, DART_BUILTINS);
+  G.dart = cLikeGrammar(DART_KEYWORDS, DART_BUILTINS, { tripleQuote: true });
 
   const SCALA_KEYWORDS = (
     'abstract case catch class def do else enum extends false final finally for forSome given ' +
@@ -581,7 +682,7 @@
     'println print List Map Set Seq Vector Array Option Some None Either Left Right Future ' +
     'String Int Long Double Boolean Unit Any Nothing'
   ).split(' ');
-  G.scala = cLikeGrammar(SCALA_KEYWORDS, SCALA_BUILTINS, { fnDeclKeywords: ['def'] });
+  G.scala = cLikeGrammar(SCALA_KEYWORDS, SCALA_BUILTINS, { fnDeclKeywords: ['def'], tripleQuote: true });
 
   const OBJC_KEYWORDS = C_KEYWORDS.concat((
     'id instancetype self super in out inout bycopy byref oneway ' +
@@ -608,6 +709,12 @@
   const RB_BUILTINS = 'puts print p gets raise lambda proc loop each map select reject reduce new'.split(' ');
 
   G.ruby = [
+    // `=begin` / `=end` blocks come before the strings that come before
+    // everything else. The markers are only special at column zero, so the
+    // anchors here are load-bearing rather than decorative. Without this rule
+    // a documentation block was read as ordinary code — the body's words came
+    // out coloured as function calls and keywords.
+    { cls: 'tk-comment', pattern: /^=begin\b[\s\S]*?^=end.*$/m },
     // Strings must come before comments, else # inside "..." (incl. #{} interpolation)
     // is eaten as a comment. String bodies stay single-line so an unpaired quote
     // in a comment can't swallow following lines.
@@ -672,7 +779,7 @@
     'select from where join inner left right full outer on group by order having limit offset ' +
     'insert into values update set delete create alter drop table view index primary key foreign ' +
     'references constraint not null default unique check and or as distinct union all case when ' +
-    'then else end exists in between like is asc desc returning with'
+    'then else end exists in between like is asc desc returning with window lateral merge using'
   ).split(' ');
   const SQL_BUILTINS = 'count sum avg min max coalesce nullif lower upper substr substring now date'.split(' ');
 
@@ -1393,7 +1500,7 @@
      * Runtime version, for shell/core compatibility negotiation.
      * Must match version.json — tools/check-versions.mjs asserts it.
      */
-    version: '0.0.1-beta.4',
+    version: '0.0.1-beta.5',
     languages: G,
     normalizeLanguage,
     detectLanguage,
