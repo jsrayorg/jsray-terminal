@@ -18,7 +18,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
+  issues: write
 
 jobs:
   sync:
@@ -45,7 +45,7 @@ jobs:
             echo "up to date on $bundled"
           fi
 
-      - name: Sync, test, and open a pull request
+      - name: Sync, test, push the branch, and file an issue
         if: steps.check.outputs.stale == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -83,21 +83,32 @@ jobs:
           dependency does not update itself and the last one left behind
           carried a denial of service for two releases."
 
-          # A pull request opened with GITHUB_TOKEN does not trigger workflows —
-          # GitHub blocks that to prevent recursion. So this PR arrives with no
-          # checks on it. That is why the suite and the freshness check run
-          # above, inline, before the branch is pushed: the validation happens,
-          # it just is not reported as a status check. If this repository ever
-          # requires status checks to merge, a sync PR will need them
-          # re-triggered by hand (close and reopen) — or a PAT, which is the
-          # cross-repo credential this design deliberately avoids.
+          # The branch is pushed here; the pull request is opened by a person.
+          #
+          # `gh pr create` needs "Allow GitHub Actions to create and approve pull
+          # requests", and that switch is organisation-wide: turning it on lets
+          # every workflow in every repository open pull requests, to save one
+          # click here. The other way round it is a stored PAT — the cross-repo
+          # credential the polling design at the top of this file exists to
+          # avoid. Neither is worth a click.
+          #
+          # So this files an issue, which needs no such permission, and puts the
+          # compare link in it. Everything automation is actually worth has
+          # already happened by this line: the staleness was noticed, the sync
+          # ran, and the suite proved it did not break anything.
+          #
+          # A human-opened pull request also gets its checks run, which one
+          # opened with GITHUB_TOKEN does not — GitHub blocks that to prevent
+          # recursion. The old path produced a pull request with no checks on it.
           git push -u origin "$branch"
 
-          gh pr create --base main --head "$branch" \
+          gh issue create \
             --title "Bundle JSRay Core $VERSION" \
-            --body "Automated. The bundled Core snapshot was \`$FROM\`; the published beta is \`$VERSION\`.
+            --body "The bundled Core snapshot is \`$FROM\`; the published beta is \`$VERSION\`.
 
-          \`tools/sync-core.sh\` replaced the vendored files from the published tarball, the suite passed, and the freshness check now agrees with the registry.
+          Branch \`$branch\` is pushed and ready. **[Open the pull request]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch?expand=1)**
+
+          \`tools/sync-core.sh\` replaced the vendored files from the published tarball, the suite passed, and the freshness check now agrees with the registry — all of that ran before the branch was pushed.
 
           **Merging this does not ship the fix.** This CLI still has to be released to npm — start that as soon as this lands if the Core release fixed a vulnerability.
 
