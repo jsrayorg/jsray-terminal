@@ -1,7 +1,7 @@
 {
   "name": "JSRay",
   "author": "Jie",
-  "version": "0.0.1-beta.5",
+  "version": "0.0.2-beta.1",
   "description": "Default palette · 23 token classes · 6 identifier families visually separated",
   "philosophy": {
     "identifier-families": {

@@ -16,7 +16,7 @@ const version = release.version;
 const channel = release.channel;
 
 expect(release.project === 'jsray-terminal', 'version.json project must be jsray-terminal');
-expect(typeof version === 'string' && /^\d+\.\d+\.\d+-(internal|beta)\.\d+$|^\d+\.\d+\.\d+$/.test(version), `version.json has an unsupported version: ${version}`);
+expect(typeof version === 'string' && /^\d+\.\d+\.\d+-(?:internal\.\d+|beta(?:\.\d+)?)$|^\d+\.\d+\.\d+$/.test(version), `version.json has an unsupported version: ${version}`);
 expect(['internal', 'beta', 'stable'].includes(channel), `version.json has an unsupported channel: ${channel}`);
 
 if (channel === 'internal') {
@@ -26,8 +26,13 @@ if (channel === 'internal') {
 }
 
 if (channel === 'beta') {
-  expect(/-beta\.\d+$/.test(version), 'beta channel versions must end with -beta.N');
-  expect(release.publicBetaReleased === true, 'beta channel must set publicBetaReleased true');
+  expect(/-beta(?:\.\d+)?$/.test(version),
+    'beta channel versions must end with -beta, optionally -beta.N');
+  // publicBetaReleased is deliberately not tied to the channel. `channel` is
+  // the version-numbering scheme and every integration sits on beta from its
+  // first commit; publicBetaReleased is whether the repository is actually
+  // out. Coupling them made this one claim a public beta while its repository
+  // was private and empty.
 }
 
 if (channel === 'stable') {
@@ -53,6 +58,29 @@ const includes = (path, needle, label = needle) =>
   expect(existsSync(path) && read(path).includes(needle), `${path} is missing ${label}`);
 includes('README.md', 'bundles a snapshot', 'the Core snapshot boundary statement');
 includes('README.zh-CN.md', '内置 Core 的快照', 'the Core snapshot boundary statement');
+
+// The phase wording drifts in whichever direction nobody is looking. jsray-wp
+// shipped a public beta calling itself internal for weeks; this repository did
+// the reverse — version.json claimed a public beta while the repository was
+// private and empty. So the check runs both ways, keyed on the flag that
+// actually moves when a repository goes out.
+const PHASE = release.publicBetaReleased
+  ? { en: 'Public beta', zh: '公开测试版', reject: /Internal test build|内部测试版/ }
+  // The negations have to survive: "no public beta yet" and "尚未发布公开测试版"
+  // are the accurate wording for this phase, and a bare search for the phrase
+  // flags them as if they claimed the opposite.
+  : { en: 'Internal test build', zh: '内部测试版',
+      reject: /(?<!no )Public beta|(?<!尚未发布)公开测试版/ };
+
+includes('README.md', PHASE.en, 'the phase this release is in');
+includes('README.zh-CN.md', PHASE.zh, 'the phase this release is in');
+
+for (const doc of ['README.md', 'README.zh-CN.md', 'SECURITY.md']) {
+  expect(
+    !PHASE.reject.test(read(doc)),
+    `${doc} still describes a phase this release is not (publicBetaReleased: ${release.publicBetaReleased})`
+  );
+}
 for (const doc of ['LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'CODE_OF_CONDUCT.md']) {
   expect(existsSync(doc), `${doc} missing — the ecosystem baseline requires it`);
 }

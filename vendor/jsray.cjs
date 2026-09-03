@@ -564,16 +564,39 @@
     // preceded: leaving it in place would keep one pattern around that can
     // still span from any apostrophe to any later one.
     if (opts.lifetimes) {
-      const at = rules.findIndex((r) => r.cls === 'tk-string' && r.pattern.source[0] === "'");
-      rules.splice(
-        at,
-        1,
+      // The character literal stays where the string rule was, because it is a
+      // string and line comments deliberately come after strings.
+      const quoted = rules.findIndex(
+        (r) => r.cls === 'tk-string' && r.pattern.source[0] === "'"
+      );
+      rules.splice(quoted, 1, {
         // Exactly one character or one escape, then the closing quote.
-        { cls: 'tk-string', pattern: /'(?:\\(?:u\{[\da-fA-F]{1,6}\}|.)|[^'\\\n])'/ },
+        cls: 'tk-string',
+        pattern: /'(?:\\(?:u\{[\da-fA-F]{1,6}\}|.)|[^'\\\n])'/,
+      });
+
+      // The lifetime goes AFTER the line-comment rule, and the distance between
+      // the two is the whole point.
+      //
+      // A lifetime has no closing quote, so `'[A-Za-z_]\w*` matches any
+      // apostrophe followed by letters — including the one in `// don't do
+      // this`, which line comments cannot defend against from behind. Sitting
+      // ahead of them, this rule cut the comment at the apostrophe and rendered
+      // the rest as code: beta.5 shipped that, and English comments in Rust are
+      // full of `don't`, `it's` and `one's`.
+      //
+      // Behind the comment rule it still fires everywhere a lifetime can occur,
+      // because a lifetime never appears inside a comment or a string — those
+      // are already consumed by the time it is reached.
+      const lineComment = rules.findIndex(
+        (r) => r.cls === 'tk-comment' && r.pattern.source.indexOf('\\/\\/') === 0
+      );
+      rules.splice(lineComment + 1, 0, {
         // A lifetime occupies the slot a type parameter occupies, so it is
         // typed as one — JSRay's vocabulary has no separate lifetime class.
-        { cls: 'tk-type', pattern: /'[A-Za-z_]\w*\b/ }
-      );
+        cls: 'tk-type',
+        pattern: /'[A-Za-z_]\w*\b/,
+      });
     }
 
     // Languages whose declarations don't always end in `(...) {` (e.g. Scala's
@@ -1471,25 +1494,367 @@
     set('--jr-gutter-fg', themeBlock.gutter);
     set('--jr-line-hl',   themeBlock.lineHighlight);
     const tokens = themeBlock.tokens || {};
-    // Fallback chain: a missing refined key resolves through its base
-    // (function.declaration → function), so palettes that predate a newly
-    // added key keep working — the vocabulary can grow in minor versions.
-    const resolveColor = (key) => {
-      let k = key;
-      while (k) {
-        const tok = tokens[k];
-        if (tok && tok.color) return tok.color;
-        const dot = k.lastIndexOf('.');
-        k = dot === -1 ? '' : k.slice(0, dot);
-      }
-      return null;
-    };
+    // The fallback chain lives in resolveToken, shared with renderPortable.
+    // Two renderers resolving the same palette by two implementations is how
+    // they drift apart, and this one had the only copy of it.
     for (const key in THEME_ALIAS) {
-      const color = resolveColor(key);
-      if (color) {
-        set('--jr-' + THEME_ALIAS[key], color);
-      }
+      const tok = resolveToken(tokens, key);
+      if (tok) set('--jr-' + THEME_ALIAS[key], tok.color);
     }
+  }
+
+  /**
+   * Resolve a palette key to a token's style, following the fallback chain.
+   *
+   * Shared by every renderer: a refined key that a palette predates resolves
+   * through its base (`function.declaration` → `function`), which is what lets
+   * the vocabulary grow in a minor version without breaking older palettes.
+   *
+   * @param {object} tokens Palette `tokens` block.
+   * @param {string} key Palette key.
+   * @returns {{color: string, fontStyle?: string}|null}
+   */
+  function resolveToken(tokens, key) {
+    let k = key;
+    while (k) {
+      const tok = tokens[k];
+      if (tok && tok.color) return tok;
+      const dot = k.lastIndexOf('.');
+      k = dot === -1 ? '' : k.slice(0, dot);
+    }
+    return null;
+  }
+
+  // Class suffix back to palette key — THEME_ALIAS read the other way. The
+  // token stream carries `tk-fn-decl`; a palette is keyed `function.declaration`.
+  const KEY_BY_SUFFIX = {};
+  for (const key in THEME_ALIAS) KEY_BY_SUFFIX[THEME_ALIAS[key]] = key;
+
+  /**
+   * Render to HTML that carries its own styling and needs no stylesheet.
+   *
+   * The third consumer of the token stream, beside `render()` and the terminal's
+   * ANSI writer. It exists for the case a plugin cannot reach: code pasted into
+   * somebody else's site, where `class="tk-keyword"` means nothing because
+   * jsray.css was never loaded, and where a rich-text editor strips `<style>`
+   * blocks and class attributes but keeps inline `style`.
+   *
+   * Costs about 40% more bytes than the class-based output and roughly twelve
+   * times the source — a twenty-line snippet lands near 7 KB, which is nothing
+   * to paste and a lot to serve, so this is for copying, not for pages that
+   * could link a stylesheet instead.
+   *
+   * Two limits are inherent rather than temporary. A pasted block cannot follow
+   * the host's light/dark setting, because inline styles are fixed at the moment
+   * of copying — the caller picks a theme block and that is the one that
+   * travels. And anything the destination's sanitizer strips is gone; inline
+   * `style` on `span` and `pre` survives the widest range, which is why nothing
+   * here depends on a class, a stylesheet, or a wrapper more elaborate than
+   * `<pre><code>`.
+   *
+   * @param {string} code Source text.
+   * @param {string} language Language id or alias.
+   * @param {object} themeBlock A palette's `dark` or `light` block.
+   * The container's own declarations always carry `!important`, because that
+   * is the only weight that survives a host stylesheet doing the same. Set
+   * `important` to extend it to the token colours as well, for a destination
+   * whose CSS reaches into spans.
+   *
+   * `frame` puts the code in a window: `header` is jsray-wp's own bar, so a
+   * block copied from here matches one the plugin rendered; `macos` is the
+   * three dots; `minimal` is a hairline strip. `title` and `label` fill it —
+   * `label` defaults to the language's display name.
+   *
+   * @param {{padding?: string, radius?: string, font?: string,
+   *          important?: boolean, frame?: 'none'|'header'|'macos'|'minimal',
+   *          title?: string, label?: string}} [options]
+   * @returns {string} A self-contained element: a `<pre>`, or a `<div>` around
+   *   one when a frame is asked for.
+   */
+  /**
+   * Blend two colours the way `color-mix()` would, but at render time.
+   *
+   * The plugin's stylesheet derives its chrome from the palette with
+   * `color-mix(in srgb, var(--jr-bg) 88%, var(--jr-fg) 12%)`. A pasted block
+   * has neither the custom properties nor a guarantee the destination's browser
+   * supports the function, so the same arithmetic happens here and ships a
+   * plain hex. Anything that is not a hex triple is returned as-is rather than
+   * guessed at — a palette may legitimately carry `rgba()`.
+   */
+  function mixHex(base, other, percentOfBase) {
+    const parse = (hex) => {
+      const s = String(hex).trim();
+      const m = /^#([\da-f]{3}|[\da-f]{6})$/i.exec(s);
+      if (!m) return null;
+      const h = m[1].length === 3 ? m[1].replace(/./g, (c) => c + c) : m[1];
+      return [
+        parseInt(h.slice(0, 2), 16),
+        parseInt(h.slice(2, 4), 16),
+        parseInt(h.slice(4, 6), 16),
+      ];
+    };
+
+    const a = parse(base);
+    const b = parse(other);
+    if (!a || !b) return base;
+
+    const w = Math.max(0, Math.min(1, percentOfBase / 100));
+    const channel = (i) => Math.round(a[i] * w + b[i] * (1 - w));
+    return '#' + [0, 1, 2]
+      .map((i) => channel(i).toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  /**
+   * "javascript" → "JavaScript", for the label a frame puts in its header.
+   *
+   * Two hops, because normalizeLanguage deliberately leaves some names alone:
+   * `c++` resolves through LANGUAGE_ALIASES to `cpp`, while `js` and `ts` have
+   * grammars registered under their own names so a TypeScript block stays
+   * labelled TypeScript — those need naming here directly. Anything unlisted
+   * is upper-cased, which reads correctly far more often than not (TOML, INI,
+   * GraphQL) and is never wrong enough to matter.
+   */
+  function languageLabel(lang) {
+    // What the caller said comes first: `jsx` collapses to `javascript` for
+    // grammar purposes, but someone who wrote jsx wants to see JSX.
+    const raw = String(lang || '').toLowerCase().replace(/^(?:language|lang)-/, '');
+    if (LANGUAGE_LABELS[raw]) return LANGUAGE_LABELS[raw];
+
+    const key = normalizeLanguage(lang);
+    if (!key) return '';
+    const canonical = LANGUAGE_ALIASES[key] || key;
+    return LANGUAGE_LABELS[key] || LANGUAGE_LABELS[canonical] || key.toUpperCase();
+  }
+
+  const LANGUAGE_LABELS = {
+    javascript: 'JavaScript', js: 'JavaScript',
+    typescript: 'TypeScript', ts: 'TypeScript',
+    jsx: 'JSX', tsx: 'TSX', vue: 'Vue',
+    python: 'Python', ruby: 'Ruby', rust: 'Rust', go: 'Go', java: 'Java',
+    kotlin: 'Kotlin', swift: 'Swift', dart: 'Dart', scala: 'Scala',
+    c: 'C', cpp: 'C++', csharp: 'C#', objectivec: 'Objective-C',
+    php: 'PHP', lua: 'Lua', perl: 'Perl', r: 'R',
+    elixir: 'Elixir', haskell: 'Haskell',
+    shell: 'Shell', powershell: 'PowerShell',
+    html: 'HTML', xml: 'XML', svg: 'SVG',
+    css: 'CSS', scss: 'Sass', sass: 'Sass', less: 'Less',
+    json: 'JSON', jsonc: 'JSON', yaml: 'YAML', toml: 'TOML', ini: 'INI',
+    sql: 'SQL', graphql: 'GraphQL', markdown: 'Markdown',
+    dockerfile: 'Dockerfile', makefile: 'Makefile', diff: 'Diff',
+  };
+
+  /**
+   * The window each block sits in. Every frame is a header strip above the
+   * code; the wrapper around them carries the border and the radius, so a
+   * frame only has to describe its own row.
+   *
+   * All of it is inline-styled for the same reason the code is — a pasted
+   * block has no stylesheet at the destination.
+   */
+  /* The chrome defends itself for the same reason the container does: a host
+     rule at !important weight beats an inline style, and a frame that loses
+     its background is a frame that looks broken rather than plain. The
+     `important` option stays what it was — a choice about the token colours. */
+  const IMPORTANT = '!important';
+
+  const FRAMES = {
+    /* jsray-wp's own header: bold title on the left, language on the right.
+       Matching the plugin means a block copied from the site and a block the
+       plugin renders look like the same product. The plugin's Copy button is
+       deliberately absent: nothing here can run script at the destination, and
+       a button that does nothing is worse than no button. */
+    header: (c) => {
+      const row = [
+        'display:flex', 'align-items:center', 'gap:10px', 'min-height:40px',
+        'padding:0 14px', 'background:' + c.headerBg, 'color:' + c.fg,
+        'border-bottom:1px solid ' + c.edge,
+        'font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+      ].map((d) => d + IMPORTANT).join(';');
+
+      const title = c.title
+        ? '<span style="font-weight:700' + IMPORTANT + ';overflow:hidden' + IMPORTANT +
+          ';text-overflow:ellipsis' + IMPORTANT + ';white-space:nowrap' + IMPORTANT +
+          '">' + escapeHtml(c.title) + '</span>'
+        : '';
+
+      const label = c.label
+        ? '<span style="margin-left:auto' + IMPORTANT + ';color:' + c.muted + IMPORTANT +
+          ';font-size:11px' + IMPORTANT + ';letter-spacing:.06em' + IMPORTANT +
+          ';text-transform:uppercase' + IMPORTANT + '">' + escapeHtml(c.label) + '</span>'
+        : '';
+
+      return '<div style="' + row + '">' + title + label + '</div>';
+    },
+
+    /* Three dots and a centred caption. The dots are spans with a background
+       and a radius rather than an image, so nothing has to load at the
+       destination for the frame to read as a window. */
+    macos: (c) => {
+      const row = [
+        'display:flex', 'align-items:center', 'gap:8px', 'min-height:38px',
+        'padding:0 14px', 'background:' + c.headerBg,
+        'border-bottom:1px solid ' + c.edge,
+        'font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+      ].map((d) => d + IMPORTANT).join(';');
+
+      const dot = (colour) => '<span style="width:11px' + IMPORTANT + ';height:11px' +
+        IMPORTANT + ';border-radius:50%' + IMPORTANT + ';display:inline-block' + IMPORTANT +
+        ';background:' + colour + IMPORTANT + '"></span>';
+
+      const caption = (c.title || c.label)
+        ? '<span style="margin:0 auto' + IMPORTANT + ';color:' + c.muted + IMPORTANT +
+          ';padding-right:45px' + IMPORTANT + ';overflow:hidden' + IMPORTANT +
+          ';text-overflow:ellipsis' + IMPORTANT + ';white-space:nowrap' + IMPORTANT +
+          '">' + escapeHtml(c.title || c.label) + '</span>'
+        : '';
+
+      return '<div style="' + row + '">' +
+        dot('#FF5F57') + dot('#FEBC2E') + dot('#28C840') + caption + '</div>';
+    },
+
+    /* A single hairline strip carrying only the language — the least chrome
+       that still reads as a deliberate window rather than a bare rectangle. */
+    minimal: (c) => {
+      const row = [
+        'display:flex', 'align-items:center', 'min-height:28px',
+        'padding:0 16px', 'background:' + c.headerBg,
+        'border-bottom:1px solid ' + c.edge, 'color:' + c.muted,
+        'font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+        'letter-spacing:.1em', 'text-transform:uppercase',
+      ].map((d) => d + IMPORTANT).join(';');
+
+      return '<div style="' + row + '">' + escapeHtml(c.title || c.label) + '</div>';
+    },
+  };
+
+  function renderPortable(code, language, themeBlock, options) {
+    const theme = themeBlock || {};
+    const tokens = theme.tokens || {};
+    const opts = options || {};
+
+    // Off by default: it costs ~11 bytes per token and only matters against a
+    // host that sets `!important` on spans themselves, which is rare — the
+    // container already defends the things whose loss actually breaks the block.
+    const bang = opts.important ? '!important' : '';
+
+    const paint = (node) => {
+      if (typeof node === 'string') return escapeHtml(node);
+      if (Array.isArray(node)) return node.map(paint).join('');
+
+      const inner = typeof node.content === 'string'
+        ? escapeHtml(node.content)
+        : paint(node.content);
+
+      const key = KEY_BY_SUFFIX[String(node.type).replace(/^tk-/, '')];
+      const tok = key ? resolveToken(tokens, key) : null;
+
+      // An unstyled token is emitted as bare text rather than an empty span:
+      // the wrapper would carry no colour and only cost bytes.
+      if (!tok) return inner;
+
+      let style = 'color:' + tok.color + bang;
+      const fontStyle = tok.fontStyle || '';
+      if (fontStyle.indexOf('bold') !== -1) style += ';font-weight:700' + bang;
+      if (fontStyle.indexOf('italic') !== -1) style += ';font-style:italic' + bang;
+
+      return '<span style="' + style + '">' + inner + '</span>';
+    };
+
+    // The internal tokenize takes a grammar, not a language name — resolving it
+    // here is what the public tokenize() does, and an unknown language has to
+    // degrade to plain text rather than throw.
+    const grammar = G[normalizeLanguage(language)];
+    const body = paint(grammar ? tokenize(code, grammar) : [String(code)]);
+
+    // The container is inline-styled for the same reason the tokens are: the
+    // background and the monospace stack have to survive the trip too, or the
+    // block arrives as coloured text in the host's body font.
+    //
+    // These carry !important unconditionally, which is the one thing that wins
+    // against a host stylesheet. Inline styles beat everything an author writes
+    // at normal weight, but an author's !important beats inline — and themes
+    // really do ship `pre { white-space: pre-wrap !important }` to stop code
+    // scrolling on phones. That single rule reflows the block and destroys the
+    // alignment, so the container defends itself for the ~80 bytes it costs.
+    const bg = theme.background || '#1C1C1E';
+    const fg = theme.foreground || '#E1E4E8';
+    const edge = theme.border || mixHex(bg, fg, 88);
+    const radius = opts.radius || '8px';
+
+    const frame = FRAMES[opts.frame] ? opts.frame : 'none';
+    const framed = frame !== 'none';
+
+    const shell = [
+      'background:' + bg,
+      'color:' + fg,
+      'padding:' + (opts.padding || '16px 18px'),
+      // Inside a frame the corners belong to the wrapper, or the code's own
+      // rounding cuts a notch out of the header sitting directly above it.
+      'border-radius:' + (framed ? '0' : radius),
+      'overflow-x:auto',
+      'font:' + (opts.font || '13px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace'),
+      // Explicit, because a host that sets `pre-wrap` would reflow the code.
+      'white-space:pre',
+      'margin:0',
+      // jsray.css gives a block a restrained 8px scrollbar through
+      // ::-webkit-scrollbar, and a pseudo-element cannot be written inline —
+      // so a pasted block was left with the browser's default, a bright slab
+      // across the foot of a dark rectangle. These two are real properties and
+      // say the same thing; where they are not supported the block simply
+      // keeps the scrollbar it would have had.
+      'scrollbar-width:thin',
+      'scrollbar-color:' + edge + ' ' + bg,
+    ];
+
+    // An unframed block still wants an edge: on a host whose background is
+    // close to the palette's, a borderless rectangle has nothing to say where
+    // it starts.
+    if (!framed) shell.push('border:1px solid ' + edge);
+
+    // The marker keeps highlightAll() off this block. Without it the auto-scan
+    // matches `pre > code`, re-renders the code in class form, and the inline
+    // colours this whole function exists to produce are gone. A destination
+    // that strips data attributes falls back to being re-highlighted in that
+    // site's own palette, which is wrong but still legible.
+    // The inner <code> needs the same weight as the <pre>. Styling `code` with
+    // a background is one of the most common things a blog theme does, and at
+    // !important it paints a band behind every line of the block; the same rule
+    // usually sets a colour, which then shows through on any token the palette
+    // leaves unstyled. Both were visible before this carried !important.
+    const inner = [
+      'font:inherit',
+      'color:inherit',
+      'background:none',
+      'padding:0',
+      'border:0',
+    ].map((d) => d + '!important').join(';');
+
+    const pre = '<pre data-jsray-portable style="' +
+      shell.map((d) => d + '!important').join(';') +
+      '"><code style="' + inner + '">' + body + '</code></pre>';
+
+    if (!framed) return pre;
+
+    const chrome = FRAMES[frame]({
+      bg,
+      fg,
+      edge,
+      radius,
+      muted: mixHex(fg, bg, 58),
+      headerBg: mixHex(bg, fg, 88),
+      title: opts.title || '',
+      label: opts.label === undefined ? languageLabel(language) : opts.label,
+    });
+
+    // overflow:hidden is what makes the wrapper's radius clip the square
+    // corners of the header and the code beneath it.
+    return '<div data-jsray-portable style="' + [
+      'border:1px solid ' + edge,
+      'border-radius:' + radius,
+      'overflow:hidden',
+      'background:' + bg,
+    ].map((d) => d + '!important').join(';') + '">' + chrome + pre + '</div>';
   }
 
   // ============================================================
@@ -1500,7 +1865,7 @@
      * Runtime version, for shell/core compatibility negotiation.
      * Must match version.json — tools/check-versions.mjs asserts it.
      */
-    version: '0.0.1-beta.5',
+    version: '0.0.2-beta.1',
     languages: G,
     normalizeLanguage,
     detectLanguage,
@@ -1540,6 +1905,28 @@
       return render(stream);
     },
 
+    /**
+     * Render to HTML that carries its own styling and needs no stylesheet.
+     *
+     * For code that leaves this page: pasted into a rich-text editor, a CMS,
+     * a newsletter — anywhere `class="tk-keyword"` resolves to nothing because
+     * jsray.css was never loaded. Editors that strip `<style>` blocks and class
+     * attributes generally keep inline `style`, which is the whole basis of it.
+     *
+     * `themeBlock` is a palette's `dark` or `light` block, e.g.
+     * `tokens.json`'s `themes.dark`. It has to be chosen at call time: inline
+     * styles are fixed once written, so a pasted block cannot follow the
+     * destination's light/dark setting the way a plugin-rendered one does.
+     *
+     * @param {string} code
+     * @param {string} lang
+     * @param {object} themeBlock
+     * @param {{padding?: string, radius?: string, font?: string}} [options]
+     */
+    renderPortable(code, lang, themeBlock, options) {
+      return renderPortable(code, lang, themeBlock, options);
+    },
+
     /** Highlight a code string into an HTML string (tokenize + render) */
     highlight(code, lang) {
       const normalized = normalizeLanguage(lang);
@@ -1564,6 +1951,10 @@
     highlightAll(root) {
       const scope = root || document;
       scope.querySelectorAll('code[class*="language-"], code[class*="lang-"], pre > code').forEach((el) => {
+        // A block from renderPortable() already carries its colours inline.
+        // Re-rendering it would swap them for classes and strip the styling
+        // on any page that has no jsray.css — which is most of them.
+        if (el.closest && el.closest('[data-jsray-portable]')) return;
         this.highlightElement(el);
       });
     },
