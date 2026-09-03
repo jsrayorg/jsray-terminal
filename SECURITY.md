@@ -18,7 +18,7 @@ This CLI reads files or stdin and writes ANSI escape sequences to a terminal:
 - The CLI performs no network access and writes no files.
 
 Vulnerabilities in the bundled JSRay Core snapshot belong to
-[JSRay Core](https://github.com/JSRayCore/JSRay) — report them the same way, and
+[JSRay Core](https://github.com/jsrayorg/jsray) — report them the same way, and
 fixes reach this project through the next Core sync.
 
 Out of scope:

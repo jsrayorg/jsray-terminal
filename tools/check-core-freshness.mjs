@@ -49,7 +49,7 @@ if (!published) {
 if (published !== bundled) {
   console.error(`::error::bundled Core is ${bundled}, the published beta is ${published}`);
   console.error("       run 'sh tools/sync-core.sh' and commit the result.");
-  console.error('       https://github.com/JSRayCore/JSRay/blob/main/CHANGELOG.md');
+  console.error('       https://github.com/jsrayorg/jsray/blob/main/CHANGELOG.md');
   process.exit(1);
 }
 

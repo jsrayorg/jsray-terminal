@@ -112,4 +112,4 @@ jobs:
 
           **Merging this does not ship the fix.** This CLI still has to be released to npm — start that as soon as this lands if the Core release fixed a vulnerability.
 
-          [Core changelog](https://github.com/JSRayCore/JSRay/blob/main/CHANGELOG.md)"
+          [Core changelog](https://github.com/jsrayorg/jsray/blob/main/CHANGELOG.md)"

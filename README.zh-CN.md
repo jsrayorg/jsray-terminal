@@ -10,7 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.0.1--beta.1-lightgrey)](CHANGELOG.md)
 [![Channel](https://img.shields.io/badge/channel-beta-blue)](CHANGELOG.md)
-[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/JSRayCore/JSRay)
+[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/jsrayorg/jsray)
 [![Node](https://img.shields.io/badge/node-%E2%89%A5%2018-339933)](package.json)
 
 > 面向终端的 JSRay 代码渲染 · ANSI 真彩 · 35 个语言族 · 零依赖
@@ -19,7 +19,7 @@
 
 ---
 
-当前仓库是围绕 [JSRay Core](https://github.com/JSRayCore/JSRay) 的独立**终端 CLI** 项目——JSRay 生态中的官方开源集成,拥有自己的版本号与更新日志。
+当前仓库是围绕 [JSRay Core](https://github.com/jsrayorg/jsray) 的独立**终端 CLI** 项目——JSRay 生态中的官方开源集成,拥有自己的版本号与更新日志。
 
 它**内置 Core 的快照**(`vendor/jsray.cjs`),而不是在运行时依赖 Core。因此在你主动执行同步之前,CLI 的行为与发布当天完全一致。
 

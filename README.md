@@ -10,7 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.0.1--beta.1-lightgrey)](CHANGELOG.md)
 [![Channel](https://img.shields.io/badge/channel-beta-blue)](CHANGELOG.md)
-[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/JSRayCore/JSRay)
+[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/jsrayorg/jsray)
 [![Node](https://img.shields.io/badge/node-%E2%89%A5%2018-339933)](package.json)
 
 > JSRay code rendering for the terminal · ANSI truecolor · 35 language families · zero dependencies
@@ -19,7 +19,7 @@
 
 ---
 
-This repository is the standalone **terminal CLI** project around [JSRay Core](https://github.com/JSRayCore/JSRay) — an official open-source integration in the JSRay ecosystem, with its own version and release notes.
+This repository is the standalone **terminal CLI** project around [JSRay Core](https://github.com/jsrayorg/jsray) — an official open-source integration in the JSRay ecosystem, with its own version and release notes.
 
 It **bundles a snapshot** of Core (`vendor/jsray.cjs`) rather than depending on it at runtime, so the CLI keeps working exactly as shipped until a sync deliberately advances it.
 

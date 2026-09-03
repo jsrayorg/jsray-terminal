@@ -3,7 +3,7 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning follows [SemVer](https://semver.org/).
 
-> This repository tracks **JSRay Terminal** versions only. [JSRay Core](https://github.com/JSRayCore/JSRay)
+> This repository tracks **JSRay Terminal** versions only. [JSRay Core](https://github.com/jsrayorg/jsray)
 > keeps its own version and changelog; the `bundledCore` field in `version.json`
 > records which Core snapshot each release ships.
 
