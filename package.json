@@ -21,7 +21,8 @@
     "sync:core": "sh tools/sync-core.sh",
     "check:versions": "node tools/check-versions.mjs",
     "test": "node --test tests/*.mjs",
-    "check:core": "node tools/check-core-freshness.mjs"
+    "check:core": "node tools/check-core-freshness.mjs",
+    "test:packaged": "node tests/packaged.mjs"
   },
   "keywords": [
     "jsray",

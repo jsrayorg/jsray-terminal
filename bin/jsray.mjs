@@ -9,7 +9,7 @@
  * Powered by the bundled JSRay Core tokenizer; colors come from the shared
  * palette JSON. Zero dependencies.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { basename, extname, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -20,8 +20,27 @@ import {
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const JSRay = require(resolve(ROOT, 'vendor/jsray.cjs'));
-const VERSION = JSON.parse(readFileSync(resolve(ROOT, 'version.json'), 'utf8')).version;
+
+/**
+ * Load a file this CLI ships with. An install missing one of these is not a
+ * mistake the user made, and it should not read like one: unguarded, a short
+ * package surfaced as a stack trace out of fs.readFileUtf8, which says nothing
+ * about what is wrong or what to do.
+ */
+function shipped(relative, load) {
+  const path = resolve(ROOT, relative);
+  if (!existsSync(path)) {
+    process.stderr.write(
+      `jsray: ${relative} is missing from this installation.\n` +
+      '       The package ships it; reinstall to restore it.\n'
+    );
+    process.exit(1);
+  }
+  return load(path);
+}
+
+const JSRay = shipped('vendor/jsray.cjs', (p) => require(p));
+const VERSION = shipped('version.json', (p) => JSON.parse(readFileSync(p, 'utf8'))).version;
 
 // Extension → language id (normalizeLanguage handles the aliases).
 const EXT_LANG = {
