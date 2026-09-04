@@ -22,7 +22,22 @@ test('--color none round-trips the input text exactly', () => {
 test('truecolor output carries 24-bit sequences and bold keywords', () => {
   const out = run(['--lang', 'js', '--color', 'truecolor'], 'const x = 1;');
   assert.match(out, /\x1b\[38;2;208;139;252m\x1b\[1mconst/); // default dark keyword
-  assert.ok(out.endsWith('\x1b[0m\n'));
+
+  // Every run ends with a reset, or the colour of the last token leaks into
+  // whatever the terminal prints next. The newline after it is not added here:
+  // the input had none, this is a pipe, and `jsray f > copy` has to produce a
+  // copy. On a terminal one is appended so the prompt starts on its own line.
+  assert.ok(out.endsWith('\x1b[0m'), 'output must end with a reset');
+});
+
+test('a pipe gets the bytes that came in, a terminal gets a newline', () => {
+  // `cat` does not add a trailing newline and neither does this: an extra byte
+  // makes `jsray f --color none > copy` differ from f, and turns an empty file
+  // into a one-byte one. Only a TTY gets the courtesy newline, which is the
+  // same rule the colour default already follows.
+  assert.equal(run(['-l', 'js', '--color', 'none'], 'const x = 1;'), 'const x = 1;');
+  assert.equal(run(['-l', 'js', '--color', 'none'], 'const x = 1;\n'), 'const x = 1;\n');
+  assert.equal(run(['-l', 'js', '--color', 'none'], ''), '');
 });
 
 test('--color 256 uses xterm palette sequences', () => {
@@ -120,6 +135,37 @@ test('an unreadable file is one line of explanation, not a stack trace', () => {
   assert.match(dir.stderr, /is a directory, not a file/);
 });
 
+test('a binary file is refused, not decoded into garbage', () => {
+  // An 18KB PNG read as UTF-8 came out as 33KB of replacement characters with
+  // an exit code of 0: the terminal left in a mangled state and nothing said
+  // about why. A NUL byte early in the file is the same signal git and grep
+  // use, so a source file with one is refused too — consistently, not silently.
+  const dir = mkdtempSync(join(tmpdir(), 'jsray-bin-'));
+  const png = join(dir, 'image.png');
+  writeFileSync(png, Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex'));
+
+  const fails = (args, input) => {
+    try {
+      execFileSync('node', [BIN, ...args], { input, encoding: 'utf8', stdio: 'pipe' });
+      return null;
+    } catch (error) {
+      return { status: error.status, stderr: error.stderr || '' };
+    }
+  };
+
+  const file = fails([png]);
+  assert.ok(file, 'a binary file should exit non-zero');
+  assert.equal(file.status, 1);
+  assert.match(file.stderr, /looks like a binary file/);
+
+  const piped = fails(['-l', 'js'], Buffer.from([0x00, 0x01, 0x02, 0x03]));
+  assert.ok(piped, 'binary on stdin should exit non-zero');
+  assert.match(piped.stderr, /binary data, not code/);
+
+  // Text that merely contains high bytes is still text.
+  assert.equal(run(['-l', 'js', '--color', 'none'], 'const s = "日本語";'), 'const s = "日本語";');
+});
+
 test('line numbers count lines, not newlines', () => {
   // A file ending in a newline splits into a final empty string that marks the
   // position after the last line rather than a line of its own. Numbering it
@@ -151,7 +197,9 @@ test('--line-range takes a window onto the file', () => {
   // A range past the end selects nothing. Clamping the start instead would
   // hand back the last line — a confident answer to a question the file
   // cannot answer.
-  assert.equal(run(['-l', 'js', '-r', '9:99', '--color', 'none'], five), '\n');
+  // Nothing selected is nothing written — a bare newline would be a line that
+  // the file does not have.
+  assert.equal(run(['-l', 'js', '-r', '9:99', '--color', 'none'], five), '');
 
   // Numbers count from the file, not from the slice: a range is a window, and
   // renumbering from 1 would misreport where the code lives.

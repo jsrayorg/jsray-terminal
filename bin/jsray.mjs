@@ -197,13 +197,31 @@ function languageFor(file, code, explicit) {
   return JSRay.detectLanguage(code);
 }
 
+/**
+ * A NUL byte in the first few kilobytes means this is not text.
+ *
+ * The heuristic git and grep use, and for the same reason: reading a PNG as
+ * UTF-8 replaces every byte that is not valid UTF-8, so an 18KB image came out
+ * as 33KB of replacement characters with an exit code of 0 — terminal state
+ * mangled, nothing said. Checking the whole file would be exact and would also
+ * mean reading a gigabyte in order to refuse it.
+ */
+function looksBinary(buffer) {
+  const window = buffer.subarray(0, Math.min(buffer.length, 8192));
+  return window.includes(0);
+}
+
 function readInput(file) {
   if (file && file !== '-') {
     // The stdin branch below has always caught its own failures; this one did
     // not, so a mistyped path answered with a Node stack trace naming
     // internal fs paths. Every other error this CLI can produce is one line.
     try {
-      return readFileSync(file, 'utf8');
+      const buffer = readFileSync(file);
+      if (looksBinary(buffer)) {
+        fail(`${file} looks like a binary file — use cat if you meant to print it`);
+      }
+      return buffer.toString('utf8');
     } catch (error) {
       if (error.code === 'ENOENT') fail(`no such file: ${file}`);
       if (error.code === 'EISDIR') fail(`${file} is a directory, not a file`);
@@ -218,7 +236,9 @@ function readInput(file) {
     process.exit(0);
   }
   try {
-    return readFileSync(0, 'utf8'); // stdin
+    const buffer = readFileSync(0); // stdin
+    if (looksBinary(buffer)) fail('the input looks like binary data, not code');
+    return buffer.toString('utf8');
   } catch {
     fail('no input: pass a file or pipe code on stdin (see --help)');
   }
@@ -312,5 +332,14 @@ inputs.forEach((file, index) => {
     process.stdout.write(`${index ? '\n' : ''}${rule}── ${label}${reset}\n`);
   }
 
-  process.stdout.write(output.endsWith('\n') ? output : output + '\n');
+  // A file that ends without a newline is written back without one. `cat`
+  // does not add it, and `jsray f --color none > copy` should produce a copy —
+  // an extra byte makes the two files differ, and an empty file come out one
+  // byte long.
+  //
+  // On a terminal the newline is worth adding anyway, or the shell prompt
+  // lands on the end of the last line. Same principle the colour default
+  // already follows: what suits a screen is not what suits a pipe.
+  const needsNewline = !output.endsWith('\n') && output !== '';
+  process.stdout.write(needsNewline && process.stdout.isTTY ? output + '\n' : output);
 });
