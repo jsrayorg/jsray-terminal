@@ -15,7 +15,7 @@
 
 > JSRay code rendering for the terminal · ANSI truecolor · 35 language families · zero dependencies
 
-<sub>Internal test build · no public beta yet · bundles a JSRay Core snapshot</sub>
+<sub>Public beta · not on npm yet · bundles a JSRay Core snapshot</sub>
 
 ---
 
@@ -30,7 +30,7 @@ It **bundles a snapshot** of Core (`vendor/jsray.cjs`) rather than depending on 
 - **35 language families** (everything Core supports), auto-detected from the file extension, filename (`Dockerfile`, `Makefile`), or content
 - **4 palettes × dark/light**: default, aurora, ember, fjord — the variant matches your terminal's background, asked rather than assumed
 - **Truecolor** by default, with xterm-256 downsampling and plain-text fallback; piped output degrades to plain automatically
-- **Zero dependencies** — plain Node ≥ 18
+- **Zero dependencies** — plain Node ≥ 20
 
 ## Usage
 

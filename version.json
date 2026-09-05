@@ -3,7 +3,7 @@
   "name": "JSRay Terminal",
   "version": "0.0.1-beta",
   "channel": "beta",
-  "publicBetaReleased": false,
+  "publicBetaReleased": true,
   "nextPublicBeta": "0.0.1-beta",
   "bundledCore": {
     "project": "jsray",

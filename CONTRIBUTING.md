@@ -40,6 +40,25 @@ Terminal-owned code is `bin/jsray.mjs` (args, IO, language resolution) and
 `version.json` and `package.json` must agree; `bundledCore.version` is maintained by the
 sync script — do not hand-edit it.
 
+### The ladder
+
+Each beta bumps the **patch**. There is no counter after `-beta`: a patch is never
+released twice, so a counter would carry no information — Core keeps one because its
+betas iterate within a patch, this does not.
+
+```
+0.0.1-beta → 0.0.2-beta → 0.0.3-beta → … → 0.1.0
+```
+
+`0.1.0` is the first stable release, and it is where this package goes to npm. The
+betas are not early drafts — they are a mature surface being walked through the
+problems that only show up in other people's terminals. Until then the channel stays
+`beta`, because `stable` claims the surface has stopped changing, and `0.0.1` is
+therefore never released as a stable version: the ladder walks past it.
+
+The major stays `0` regardless: the ecosystem rule ties an integration's major to the
+Core it bundles, and Core is still `0.x`.
+
 ## Commit conventions
 
 Short, imperative subjects, optionally scoped:
