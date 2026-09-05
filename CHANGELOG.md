@@ -17,9 +17,9 @@ First public release, source on GitHub and installable from it:
 npm i -g github:jsrayorg/jsray-terminal
 ```
 
-Not on npm yet. The terminal-background detection this release depends on has
-been exercised on one terminal and a synthetic pty, and a registry version
-cannot be taken back; npm follows once it has been run somewhere else.
+Installed from GitHub while the terminal-background detection this release
+depends on gets exercised beyond one terminal and a synthetic pty — a registry
+version cannot be taken back, so npm follows at `0.1.0`.
 
 The CLI vendors a JSRay Core snapshot rather than depending on it, so `jsray`
 is one self-contained package whose engine can be verified against the digests

@@ -10,12 +10,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.0.1--beta-lightgrey)](CHANGELOG.md)
 [![Channel](https://img.shields.io/badge/channel-beta-blue)](CHANGELOG.md)
-[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/jsrayorg/jsray)
-[![Node](https://img.shields.io/badge/node-%E2%89%A5%2018-339933)](package.json)
+[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.2--beta.1-success)](https://github.com/jsrayorg/jsray)
+[![Node](https://img.shields.io/badge/node-%E2%89%A5%2020-339933)](package.json)
 
 > 面向终端的 JSRay 代码渲染 · ANSI 真彩 · 35 个语言族 · 零依赖
 
-<sub>公开测试版 · 尚未发布到 npm · 内置 JSRay Core 快照</sub>
+<sub>公开测试版 · 内置 JSRay Core 快照</sub>
 
 ---
 
@@ -57,8 +57,7 @@ jsray --list-themes
 npm i -g github:jsrayorg/jsray-terminal
 ```
 
-尚未发布到 npm——原因见[更新日志](CHANGELOG.md)里 `0.0.1-beta` 那一节。本包零依赖、
-无构建步骤,所以从仓库安装拿到的文件与从 registry 安装完全一致。
+本包零依赖、无构建步骤,所以从仓库安装拿到的文件与从 registry 安装完全一致。
 
 ```sh
 jsray --verify-core     # 用 Core 公布的摘要校验内置引擎

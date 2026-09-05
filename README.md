@@ -10,12 +10,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.0.1--beta-lightgrey)](CHANGELOG.md)
 [![Channel](https://img.shields.io/badge/channel-beta-blue)](CHANGELOG.md)
-[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/jsrayorg/jsray)
-[![Node](https://img.shields.io/badge/node-%E2%89%A5%2018-339933)](package.json)
+[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.2--beta.1-success)](https://github.com/jsrayorg/jsray)
+[![Node](https://img.shields.io/badge/node-%E2%89%A5%2020-339933)](package.json)
 
 > JSRay code rendering for the terminal · ANSI truecolor · 35 language families · zero dependencies
 
-<sub>Public beta · not on npm yet · bundles a JSRay Core snapshot</sub>
+<sub>Public beta · bundles a JSRay Core snapshot</sub>
 
 ---
 
@@ -57,7 +57,6 @@ Variant resolution: `--mode` if given, else `COLORFGBG`, else the terminal's own
 npm i -g github:jsrayorg/jsray-terminal
 ```
 
-Not on npm yet — see the note under `0.0.1-beta` in the [changelog](CHANGELOG.md).
 There is no build step and there are no dependencies, so installing from the
 repository gives you the same files a registry install would.
 
