@@ -54,7 +54,21 @@ Variant resolution: `--mode` if given, else `COLORFGBG`, else the terminal's own
 ## Install
 
 ```sh
-npm link          # from the repository root; exposes `jsray` on PATH
+npm i -g github:jsrayorg/jsray-terminal
+```
+
+Not on npm yet — see the note under `0.0.1-beta` in the [changelog](CHANGELOG.md).
+There is no build step and there are no dependencies, so installing from the
+repository gives you the same files a registry install would.
+
+```sh
+jsray --verify-core     # confirm the bundled engine against Core's digests
+```
+
+From a clone, for development:
+
+```sh
+npm link                # exposes `jsray` on PATH
 ```
 
 ## Project layout

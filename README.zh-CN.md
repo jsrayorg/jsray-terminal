@@ -54,7 +54,20 @@ jsray --list-themes
 ## 安装
 
 ```sh
-npm link          # 在仓库根目录执行,把 `jsray` 挂到 PATH 上
+npm i -g github:jsrayorg/jsray-terminal
+```
+
+尚未发布到 npm——原因见[更新日志](CHANGELOG.md)里 `0.0.1-beta` 那一节。本包零依赖、
+无构建步骤,所以从仓库安装拿到的文件与从 registry 安装完全一致。
+
+```sh
+jsray --verify-core     # 用 Core 公布的摘要校验内置引擎
+```
+
+从克隆的仓库做开发:
+
+```sh
+npm link                # 把 `jsray` 挂到 PATH 上
 ```
 
 ## 项目结构
