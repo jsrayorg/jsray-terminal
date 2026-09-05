@@ -14,6 +14,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # tools/hooks/commit-msg only protects a machine that has run
+  # `git config core.hooksPath tools/hooks`. Nothing protected the pull request
+  # itself, which is how `Release 0.0.2-beta.2` reached Core's main and printed
+  # itself beside a dozen files — permanently, since a merged subject cannot be
+  # reworded once a tag points at it. Same file, run where it cannot be skipped.
+  subjects:
+    name: Commit subjects
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Every commit the pull request adds, not just its tip.
+          fetch-depth: 0
+      - name: Check each subject against tools/hooks/commit-msg
+        run: |
+          set -e
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          failed=0
+          for sha in $(git rev-list --no-merges "$base..$head"); do
+            git log -1 --format=%B "$sha" > /tmp/msg
+            if ! sh tools/hooks/commit-msg /tmp/msg; then
+              echo "  ^ $(git log -1 --format='%h %s' "$sha")"
+              failed=1
+            fi
+          done
+          [ "$failed" = "0" ] || exit 1
+
   test:
     name: Test on Node ${{ matrix.node }}
     runs-on: ubuntu-latest
