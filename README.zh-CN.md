@@ -28,7 +28,7 @@
 `jsray` 用 ANSI 颜色在终端里渲染代码,背后是与其它所有 JSRay 表面**完全相同的分词器和调色板**:`JSRay.tokenize()` 产出与渲染器无关的 token 流,本项目把它映射为 ANSI 转义序列,而不是 HTML span。九族分离同样保留——参数斜体琥珀,声明加粗薄荷,关键字加粗。
 
 - **35 个语言族**(Core 支持的全部),依据文件扩展名、特殊文件名(`Dockerfile`、`Makefile`)或内容自动识别
-- **4 款调色板 × 明暗两态**:default、aurora、ember、fjord
+- **4 款调色板 × 明暗两态**:default、aurora、ember、fjord —— 明暗跟随你终端的背景色,是问出来的,不是猜的
 - 默认 **truecolor**,并提供 xterm-256 降采样与纯文本回退;输出被管道接收时自动降级为纯文本
 - **零依赖**——只需 Node ≥ 18
 
@@ -38,7 +38,7 @@
 jsray src/app.py                        # 渲染文件
 cat query.sql | jsray                   # 从标准输入读取,自动识别
 jsray notes.md --theme aurora           # 选择调色板
-jsray config.toml --mode light          # 明色变体
+jsray config.toml --mode light          # 覆盖自动判定的明暗
 jsray server.go -n                      # 显示行号
 jsray build.log --color none            # 强制纯文本
 jsray --list-languages                  # 列出 Core 支持的全部语言
@@ -48,6 +48,8 @@ jsray --list-themes
 语言判定顺序:`--lang` → 文件扩展名 → 特殊文件名 → 对内容执行 `JSRay.detectLanguage()`。无法识别的输入会退化为纯文本,而不是报错。
 
 颜色判定:`--color auto`(默认)在 `COLORTERM` 宣告真彩时使用 truecolor,否则使用 xterm-256;当 stdout 不是 TTY 时输出纯文本。可用 `--color truecolor|256|none` 覆盖。
+
+明暗判定:优先 `--mode`,其次 `COLORFGBG`,最后向终端发 OSC 11 查询背景色。不作答的终端一律按暗色处理。这件事比听起来重要:暗色配色放在白底终端上,25 个颜色里有 21 个对比度低于 3:1。
 
 ## 安装
 

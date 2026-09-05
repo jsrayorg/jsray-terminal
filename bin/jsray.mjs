@@ -9,7 +9,8 @@
  * Powered by the bundled JSRay Core tokenizer; colors come from the shared
  * palette JSON. Zero dependencies.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, openSync, closeSync, writeSync, readSync } from 'node:fs';
+import { ReadStream } from 'node:tty';
 import { basename, extname, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -74,7 +75,8 @@ Options:
   -l, --lang <id>               language (default: from filename, else auto-detect)
   -r, --line-range <N:M>        only lines N through M (N: to end, :M from start)
   -t, --theme <name>            palette: ${listPalettes().join(', ')} (default: default)
-  -m, --mode <dark|light>       theme variant (default: dark)
+  -m, --mode <dark|light>       theme variant
+                                (default: matches the terminal background)
   -n, --line-numbers            show line numbers
       --color <auto|truecolor|256|none>
                                 color output (default: auto)
@@ -89,13 +91,13 @@ Options:
 `;
 
 function parseArgs(argv) {
-  const opts = { files: [], lang: '', theme: 'default', mode: 'dark', color: 'auto', lineNumbers: false, palette: '', range: '' };
+  const opts = { files: [], lang: '', theme: 'default', mode: '', color: 'auto', lineNumbers: false, palette: '', range: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {
       case '-l': case '--lang': opts.lang = argv[++i] || ''; break;
       case '-t': case '--theme': opts.theme = argv[++i] || 'default'; break;
-      case '-m': case '--mode': opts.mode = argv[++i] || 'dark'; break;
+      case '-m': case '--mode': opts.mode = argv[++i] || ''; break;
       case '--color': opts.color = argv[++i] || 'auto'; break;
       case '-n': case '--line-numbers': opts.lineNumbers = true; break;
       case '--list-languages': opts.listLanguages = true; break;
@@ -167,6 +169,81 @@ function sliceLines(text, range, showNumbers) {
     .join('\n') + (trailing ? '\n' : '');
 }
 
+/**
+ * How many columns one code point occupies.
+ *
+ * CJK and fullwidth forms take two cells; combining marks take none. Anything
+ * cleverer than this — emoji sequences, regional indicators — is a job for a
+ * grapheme segmenter, and getting those wrong costs a column, not a line.
+ */
+function charWidth(cp) {
+  if (cp >= 0x0300 && cp <= 0x036f) return 0; // combining diacriticals
+  if (cp === 0x200b || cp === 0x200d || cp === 0xfeff) return 0; // joiners
+  const wide =
+    (cp >= 0x1100 && cp <= 0x115f) ||   // hangul jamo
+    (cp >= 0x2e80 && cp <= 0xa4cf) ||   // CJK radicals through yi
+    (cp >= 0xac00 && cp <= 0xd7a3) ||   // hangul syllables
+    (cp >= 0xf900 && cp <= 0xfaff) ||   // CJK compatibility
+    (cp >= 0xfe30 && cp <= 0xfe6f) ||   // CJK compatibility forms
+    (cp >= 0xff00 && cp <= 0xff60) ||   // fullwidth forms
+    (cp >= 0xffe0 && cp <= 0xffe6) ||
+    (cp >= 0x1f300 && cp <= 0x1f64f) || // emoji blocks in common use
+    (cp >= 0x1f900 && cp <= 0x1f9ff) ||
+    (cp >= 0x20000 && cp <= 0x3fffd);   // CJK extension B and beyond
+  return wide ? 2 : 1;
+}
+
+/**
+ * Wrap long lines so continuations line up under the code, not under the
+ * gutter.
+ *
+ * Left to the terminal, a line longer than the window wraps to column 0, and
+ * the continuation sits where a line number should be — reading as a line of
+ * code that was never numbered. `less -N` and `cat -n` have the same problem;
+ * having a gutter at all is what creates the obligation to keep it.
+ *
+ * Escape sequences occupy no columns and must not be counted, or every
+ * coloured line would wrap early — which is the bug that shows up as ragged
+ * right edges rather than as anything obviously broken.
+ */
+function wrapToGutter(text, gutter, columns) {
+  // Under a certain width there is more gutter than code and wrapping stops
+  // helping. Leave those lines to the terminal.
+  if (columns - gutter < 16) return text;
+
+  const indent = ' '.repeat(gutter);
+
+  return text.split('\n').map((line) => {
+    let out = '';
+    let col = 0;
+
+    for (let i = 0; i < line.length; ) {
+      if (line[i] === '\x1b') {
+        // SGR and friends: ESC [ ... final-byte. Zero width, copied verbatim.
+        const end = line.indexOf('m', i);
+        const stop = end === -1 ? line.length : end + 1;
+        out += line.slice(i, stop);
+        i = stop;
+        continue;
+      }
+
+      const cp = line.codePointAt(i);
+      const char = String.fromCodePoint(cp);
+      const width = charWidth(cp);
+
+      if (col + width > columns) {
+        out += '\n' + indent;
+        col = gutter;
+      }
+      out += char;
+      col += width;
+      i += char.length;
+    }
+
+    return out;
+  }).join('\n');
+}
+
 /** The gutter color sequence, reused for the multi-file header rule. */
 function gutterOpen(themeBlock, colorMode) {
   const probe = withLineNumbers('x', themeBlock, colorMode);
@@ -184,6 +261,110 @@ function resolveColorMode(requested) {
   if (!process.stdout.isTTY) return 'none';
   const ct = (process.env.COLORTERM || '').toLowerCase();
   return ct.includes('truecolor') || ct.includes('24bit') ? 'truecolor' : '256';
+}
+
+/** Relative luminance, the WCAG definition. 0 is black, 1 is white. */
+function luminance([r, g, b]) {
+  const channel = (v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+/**
+ * Ask the terminal what its background is, with OSC 11.
+ *
+ * The reply is `ESC ] 11 ; rgb:rrrr/gggg/bbbb ST`, components of 1–4 hex
+ * digits. Terminals that do not implement the query answer nothing at all —
+ * there is no "unsupported" reply — so the read runs on a deadline and every
+ * failure returns null.
+ *
+ * The query goes to /dev/tty rather than stdout so it still works when output
+ * is being piped somewhere, and the tty is put back the way it was found
+ * whatever happens on the way out.
+ */
+function queryBackground(timeoutMs = 100) {
+  let fd = null;
+  let raw = null;
+  try {
+    fd = openSync('/dev/tty', 'r+');
+    raw = new ReadStream(fd);
+    raw.setRawMode(true);
+    writeSync(fd, '\x1b]11;?\x1b\\');
+
+    const buffer = Buffer.alloc(64);
+    const idle = new Int32Array(new SharedArrayBuffer(4));
+    const deadline = Date.now() + timeoutMs;
+    let reply = '';
+
+    while (Date.now() < deadline) {
+      let read = 0;
+      try {
+        read = readSync(fd, buffer, 0, buffer.length, null);
+      } catch (error) {
+        // Nothing typed yet. Anything else means the tty is not answering.
+        if (error.code !== 'EAGAIN') break;
+      }
+      if (read > 0) {
+        reply += buffer.toString('latin1', 0, read);
+        if (/\x1b\\|\x07/.test(reply)) break; // terminator arrived
+      } else {
+        Atomics.wait(idle, 0, 0, 2); // sleep 2ms rather than spin
+      }
+    }
+
+    const match = /rgb:([0-9a-f]{1,4})\/([0-9a-f]{1,4})\/([0-9a-f]{1,4})/i.exec(reply);
+    if (!match) return null;
+
+    // Components are scaled to their own width: "ff" and "ffff" are both full.
+    return match.slice(1, 4).map((hex) => {
+      const max = 16 ** hex.length - 1;
+      return Math.round((parseInt(hex, 16) / max) * 255);
+    });
+  } catch {
+    return null;
+  } finally {
+    try { raw?.setRawMode(false); } catch { /* the tty is already gone */ }
+    try { raw?.destroy(); } catch { /* ditto */ }
+    if (fd !== null && !raw) { try { closeSync(fd); } catch { /* ditto */ } }
+  }
+}
+
+/**
+ * Which theme variant to draw with.
+ *
+ * `dark` used to be a fixed default, which made it a guess about a screen this
+ * process had never looked at. On a white terminal it guessed wrong and 21 of
+ * the default palette's 25 colors landed under 3:1 contrast — a shebang line
+ * in pale grey on white.
+ *
+ * So: the flag if it was given, then COLORFGBG (free, some terminals export
+ * it), then the terminal itself. Nothing found still means dark, because an
+ * unknown terminal should get exactly the behaviour this replaced.
+ */
+function resolveMode(requested, colorMode) {
+  if (requested) {
+    if (!['dark', 'light'].includes(requested)) fail(`invalid --mode: ${requested} (dark|light)`);
+    return requested;
+  }
+
+  // With no color there is no theme to get wrong, and no reason to pay for a
+  // round trip to the terminal.
+  if (colorMode === 'none') return 'dark';
+
+  // "15;0" or "15;default;0" — the last field is the background, as an ANSI
+  // color index. 7 and 9-15 are the light half of the standard palette.
+  const fgbg = (process.env.COLORFGBG || '').split(';').pop();
+  if (/^\d+$/.test(fgbg)) {
+    const index = Number(fgbg);
+    return index === 7 || (index >= 9 && index <= 15) ? 'light' : 'dark';
+  }
+
+  const rgb = queryBackground();
+  if (rgb) return luminance(rgb) > 0.4 ? 'light' : 'dark';
+
+  return 'dark';
 }
 
 function languageFor(file, code, explicit) {
@@ -285,9 +466,9 @@ if (opts.listLanguages) {
   process.exit(0);
 }
 
-if (!['dark', 'light'].includes(opts.mode)) fail(`invalid --mode: ${opts.mode} (dark|light)`);
 
 const colorMode = resolveColorMode(opts.color);
+const mode = resolveMode(opts.mode, colorMode);
 
 let palette;
 try {
@@ -301,7 +482,7 @@ try {
 } catch (err) {
   fail(err.message);
 }
-const themeBlock = palette.themes[opts.mode];
+const themeBlock = palette.themes[mode];
 const styles = colorMode === 'none' ? null : buildStyles(themeBlock, colorMode);
 const range = parseRange(opts.range);
 
@@ -322,6 +503,17 @@ inputs.forEach((file, index) => {
   // style on every line, which is what makes a slice safe to take.
   if (range) output = sliceLines(output, range, opts.lineNumbers);
   else if (opts.lineNumbers) output = withLineNumbers(output, themeBlock, colorMode);
+
+  // Only a terminal has a width to wrap to, and only a gutter can be wrapped
+  // out from under. A pipe keeps getting the file's own lines.
+  if (opts.lineNumbers && process.stdout.isTTY && process.stdout.columns) {
+    // Measured off the rendered line rather than recomputed: the numbers are
+    // padded to a width that depends on whether a range was taken, and a
+    // second guess at it would be a second thing to keep in step.
+    const first = output.split('\n', 1)[0].replace(/\x1b\[[0-9;]*m/g, '');
+    const gutter = /^\s*\d+ │ /.exec(first);
+    if (gutter) output = wrapToGutter(output, gutter[0].length, process.stdout.columns);
+  }
 
   // A header only earns its line when there is more than one file to tell
   // apart; a single file is the common case and should look untouched.

@@ -9,6 +9,15 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- The dark/light variant is now detected instead of assumed: `--mode` if given, then `COLORFGBG`, then an OSC 11 query to the terminal itself. A terminal that does not answer still gets dark, so nothing regresses where the query is unsupported. The fixed `dark` default was a guess about a screen the process had never seen, and on a light terminal 21 of the default palette's 25 colors landed under 3:1 contrast.
+- Piped output is byte-exact: a file that ends without a newline is written back without one, and an empty selection writes nothing. The trailing newline is a courtesy to a terminal, added only when stdout is a TTY — the same rule `--color auto` already follows. `jsray f --color none > copy` now produces a copy.
+- With `-n`, lines longer than the window wrap under the code rather than under the gutter. Escape sequences do not count toward the width, and CJK counts as two columns.
+
+### Fixed
+- A binary file is refused with one line instead of being decoded as UTF-8. An 18KB PNG previously printed 33KB of replacement characters and exited 0.
+- A missing shipped file (`palettes/`, `vocabulary.json`, `vendor/jsray.cjs`, `version.json`) reports what is missing instead of surfacing an fs stack trace, including for the reads that happen before `main` runs.
+
 ## [0.0.1-beta] — 2026-08-01
 
 First public beta. The CLI vendors a JSRay Core snapshot rather than depending

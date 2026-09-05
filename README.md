@@ -28,7 +28,7 @@ It **bundles a snapshot** of Core (`vendor/jsray.cjs`) rather than depending on 
 `jsray` renders code in the terminal with ANSI colors, powered by the **same tokenizer and the same palettes** as every other JSRay surface: `JSRay.tokenize()` produces a renderer-agnostic token stream, and this project maps it to ANSI escape sequences instead of HTML spans. Nine-family separation included — parameters italic amber, declarations bold mint, keywords bold.
 
 - **35 language families** (everything Core supports), auto-detected from the file extension, filename (`Dockerfile`, `Makefile`), or content
-- **4 palettes × dark/light**: default, aurora, ember, fjord
+- **4 palettes × dark/light**: default, aurora, ember, fjord — the variant matches your terminal's background, asked rather than assumed
 - **Truecolor** by default, with xterm-256 downsampling and plain-text fallback; piped output degrades to plain automatically
 - **Zero dependencies** — plain Node ≥ 18
 
@@ -38,7 +38,7 @@ It **bundles a snapshot** of Core (`vendor/jsray.cjs`) rather than depending on 
 jsray src/app.py                        # highlight a file
 cat query.sql | jsray                   # stdin, auto-detected
 jsray notes.md --theme aurora           # pick a palette
-jsray config.toml --mode light          # light variant
+jsray config.toml --mode light          # override the detected variant
 jsray server.go -n                      # line numbers
 jsray build.log --color none            # force plain
 jsray --list-languages                  # everything Core supports
@@ -48,6 +48,8 @@ jsray --list-themes
 Language resolution order: `--lang` → file extension → special filenames → `JSRay.detectLanguage()` on the content. Undetectable input degrades to plain text, never an error.
 
 Color resolution: `--color auto` (default) uses truecolor when `COLORTERM` advertises it, xterm-256 otherwise, and plain text when stdout is not a TTY. Override with `--color truecolor|256|none`.
+
+Variant resolution: `--mode` if given, else `COLORFGBG`, else the terminal's own answer to an OSC 11 background query. A terminal that does not answer gets the dark variant. This matters more than it sounds: the dark palette on a white background puts 21 of its 25 colors under 3:1 contrast.
 
 ## Install
 
