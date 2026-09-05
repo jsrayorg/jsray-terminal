@@ -61,19 +61,38 @@ Core it bundles, and Core is still `0.x`.
 
 ## Commit conventions
 
-Short, imperative subjects, optionally scoped:
+One imperative sentence that says **what changed and why it is better**, then a
+blank line, then a body that answers why. `tools/hooks/commit-msg` enforces
+this — install it with `git config core.hooksPath tools/hooks`, and CI runs the
+same file against every commit a pull request adds.
 
 ```
-fix(cli): exit quietly when the downstream pipe closes early
-feat: add a copy button to the block toolbar
-chore: sync Core snapshot (token fallback chain)
-docs: correct the language-family count
+✗  fix(cli): exit quietly when the downstream pipe closes early
+✗  chore: sync Core snapshot
+✗  0.0.1-beta.3
+✗  Release 0.0.2-beta.2
+
+✓  Exit quietly when the downstream pipe closes early
+✓  Bundle Core 0.0.2-beta.3 so the CLI renders what the site does
 ```
+
+**No type prefixes.** `feat:`, `fix:`, `chore:` classify a commit instead of
+describing it. **No bare version numbers**, with or without a word in front: a
+version names the release without saying anything about it, and it lands on
+every file the release touched.
+
+**One concern per commit, and a version bump is a concern of its own.** The
+subject is printed beside every file the commit touched, so a commit carrying
+four unrelated changes prints a sentence that is a quarter true of each of
+them. A merged subject cannot be reworded afterwards.
+
+**Keep the subject under about 60 characters** — GitHub's file listing
+truncates there.
 
 ## Pull requests
 
 - One PR per concern, to keep reviews easy.
-- Behavior changes must come with added or updated tests — CI runs the suite on Node 18, 20, and 22, and a PR cannot merge red.
+- Behavior changes must come with added or updated tests — CI runs the suite on Node 20, 22, and 24, and a PR cannot merge red.
 - Passing CI is necessary but not sufficient: every PR also needs maintainer review before it merges.
 
 ## Code of Conduct
