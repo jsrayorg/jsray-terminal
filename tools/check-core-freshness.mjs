@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Fail when the bundled Core snapshot is older than the published Core.
+ * Report when the bundled Core snapshot is older than the published Core.
+ *
+ * Advisory by default; fails only with `--strict` or JSRAY_STRICT_DRIFT=1.
  *
  * This repository does not depend on Core at runtime — it vendors a copy,
  * because the CLI installs as one self-contained package with a
@@ -46,11 +48,24 @@ if (!published) {
   process.exit(0);
 }
 
+// Being behind between releases is the normal state, not a defect: a bundled
+// copy cannot follow Core in real time. Every artifact freezes the snapshot it
+// was built from — a .vsix, a plugin zip, and the source archive GitHub
+// attaches to a tag alike — so alignment is something a release does, not
+// something a repository maintains continuously. Failing here on every push
+// would demand the one thing that is not possible, and the noise would be paid
+// for daily.
+//
+// The gate is where it can be met: nothing may be packaged from a stale
+// engine. That is what `--strict` is for, and it is wired into each repository's
+// packaging script.
 if (published !== bundled) {
-  console.error(`::error::bundled Core is ${bundled}, the published beta is ${published}`);
-  console.error("       run 'sh tools/sync-core.sh' and commit the result.");
+  const strict = process.argv.includes('--strict') || process.env.JSRAY_STRICT_DRIFT === '1';
+  const level = strict ? 'error' : 'warning';
+  console.error(`::${level}::bundled Core is ${bundled}, the published beta is ${published}`);
+  console.error("       run 'sh tools/sync-core.sh' as part of the next release here.");
   console.error('       https://github.com/jsrayorg/jsray/blob/main/CHANGELOG.md');
-  process.exit(1);
+  process.exit(strict ? 1 : 0);
 }
 
 console.log(`bundled Core ${bundled} matches the published beta`);
