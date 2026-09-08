@@ -10,12 +10,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.0.1--beta-lightgrey)](CHANGELOG.md)
 [![Channel](https://img.shields.io/badge/channel-beta-blue)](CHANGELOG.md)
-[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.1--beta.1-success)](https://github.com/jsrayorg/jsray)
-[![Node](https://img.shields.io/badge/node-%E2%89%A5%2018-339933)](package.json)
+[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.2--beta.1-success)](https://github.com/jsrayorg/jsray)
+[![Node](https://img.shields.io/badge/node-%E2%89%A5%2020-339933)](package.json)
 
 > JSRay code rendering for the terminal · ANSI truecolor · 35 language families · zero dependencies
 
-<sub>Internal test build · no public beta yet · bundles a JSRay Core snapshot</sub>
+<sub>Public beta · bundles a JSRay Core snapshot</sub>
 
 ---
 
@@ -30,7 +30,7 @@ It **bundles a snapshot** of Core (`vendor/jsray.cjs`) rather than depending on 
 - **35 language families** (everything Core supports), auto-detected from the file extension, filename (`Dockerfile`, `Makefile`), or content
 - **4 palettes × dark/light**: default, aurora, ember, fjord — the variant matches your terminal's background, asked rather than assumed
 - **Truecolor** by default, with xterm-256 downsampling and plain-text fallback; piped output degrades to plain automatically
-- **Zero dependencies** — plain Node ≥ 18
+- **Zero dependencies** — plain Node ≥ 20
 
 ## Usage
 
@@ -54,7 +54,20 @@ Variant resolution: `--mode` if given, else `COLORFGBG`, else the terminal's own
 ## Install
 
 ```sh
-npm link          # from the repository root; exposes `jsray` on PATH
+npm i -g github:jsrayorg/jsray-terminal
+```
+
+There is no build step and there are no dependencies, so installing from the
+repository gives you the same files a registry install would.
+
+```sh
+jsray --verify-core     # confirm the bundled engine against Core's digests
+```
+
+From a clone, for development:
+
+```sh
+npm link                # exposes `jsray` on PATH
 ```
 
 ## Project layout

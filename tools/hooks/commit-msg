@@ -1,0 +1,68 @@
+#!/bin/sh
+# Check a commit message against the conventions in CONTRIBUTING.md.
+#
+# The rules there are only worth writing down if something applies them at the
+# moment the message is written. Reviewing a subject after it is on main means
+# either living with it or rewriting published history, and this project has
+# already decided it will not do the second.
+#
+# Install:  git config core.hooksPath tools/hooks
+# Bypass:   git commit --no-verify   (for a genuine exception, not a hurry)
+set -e
+
+MSG_FILE="$1"
+SUBJECT=$(head -1 "$MSG_FILE")
+
+# A merge, revert, or fixup subject is generated; the rules are for prose.
+case "$SUBJECT" in
+  Merge\ *|Revert\ *|fixup!*|squash!*) exit 0 ;;
+esac
+
+fail() {
+  echo "commit-msg: $1" >&2
+  echo "            see CONTRIBUTING.md — bypass with --no-verify if this is a real exception" >&2
+  exit 1
+}
+
+# Type prefixes classify instead of describing, and `chore:` reads as
+# "not worth your time". A prefix earns its characters only when it names
+# where the change lands (`Cluster: …`), not what kind of change it is.
+case "$SUBJECT" in
+  feat:*|feat\(*|fix:*|fix\(*|chore:*|chore\(*|docs:*|docs\(*|style:*|refactor:*|perf:*|test:*|build:*|ci:*|brand:*|deploy:*|release:*)
+    fail "drop the type prefix — say what changed, not which category it belongs to" ;;
+esac
+
+# A bare version number names the release without saying anything about it,
+# and it lands on every file the release touched — which is where it is most
+# visible and least useful: GitHub prints the subject beside every path.
+#
+# One leading word does not rescue it. `Release 0.0.2-beta.2` slipped past the
+# bare-version pattern and did exactly what the bare version would have done,
+# on twelve files, permanently — a released commit cannot be reworded, because
+# the tag points at it and this project does not rewrite published history.
+if printf '%s' "$SUBJECT" | grep -qiE '^(release|releasing|bump|bumping|version|publish|publishing|tag)?[[:space:]]*v?[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z]+)*$'; then
+  fail "a version number is not a description of the change — say what the release brings"
+fi
+
+# The merge appends the pull request number. Typing it produces `(#6) (#6)`,
+# because a single-commit pull request squashes using this subject.
+if printf '%s' "$SUBJECT" | grep -qE '\(#[0-9]+\)'; then
+  fail "do not type the (#N) — gh pr merge appends it, and typing it doubles it"
+fi
+
+LENGTH=${#SUBJECT}
+if [ "$LENGTH" -gt 72 ]; then
+  fail "subject is $LENGTH characters; keep it under about 60 so GitHub's file listing does not truncate it"
+fi
+if [ "$LENGTH" -gt 60 ]; then
+  echo "commit-msg: subject is $LENGTH characters — GitHub's file listing truncates near 60" >&2
+fi
+
+# The body carries the why. A commit with none is a change nobody can review
+# later without reconstructing the reasoning from the diff.
+BODY=$(sed '1,2d' "$MSG_FILE" | grep -v '^#' | grep -c . || true)
+if [ "${BODY:-0}" -eq 0 ]; then
+  echo "commit-msg: no body — the subject says what changed, the body should say why" >&2
+fi
+
+exit 0

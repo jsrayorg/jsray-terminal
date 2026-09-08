@@ -135,4 +135,25 @@ writeFileSync(
   ) + '\n'
 );
 
+// The README badges state the bundled Core, and nothing was keeping them in
+// step here: this script updated version.json and left them behind, which is
+// how they came to sit a whole version line stale — 0.0.1-beta.1 on the first
+// thing anyone sees, beside a bundle of 0.0.2-beta.1. The other two
+// integrations derive it; this copy was written without that part and went
+// public without it. Derive it.
+const badge = coreRelease.version.replace(/-/g, '--');
+
+for (const doc of ['README.md', 'README.zh-CN.md']) {
+  const before = readFileSync(doc, 'utf8');
+  const after = before.replace(
+    /JSRay%20Core-[^-)]*(?:--[^-)]*)*-success/g,
+    `JSRay%20Core-${badge}-success`
+  );
+
+  if (after !== before) {
+    writeFileSync(doc, after);
+    console.log(`${doc} — Core badge now reads ${coreRelease.version}`);
+  }
+}
+
 console.log(`core-integrity.json pinned — ${Object.keys(files).length} files, Core ${coreRelease.version}`);

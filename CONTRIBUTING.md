@@ -40,21 +40,59 @@ Terminal-owned code is `bin/jsray.mjs` (args, IO, language resolution) and
 `version.json` and `package.json` must agree; `bundledCore.version` is maintained by the
 sync script — do not hand-edit it.
 
+### The ladder
+
+Each beta bumps the **patch**. There is no counter after `-beta`: a patch is never
+released twice, so a counter would carry no information — Core keeps one because its
+betas iterate within a patch, this does not.
+
+```
+0.0.1-beta → 0.0.2-beta → 0.0.3-beta → … → 0.1.0
+```
+
+`0.1.0` is the first stable release, and it is where this package goes to npm. The
+betas are not early drafts — they are a mature surface being walked through the
+problems that only show up in other people's terminals. Until then the channel stays
+`beta`, because `stable` claims the surface has stopped changing, and `0.0.1` is
+therefore never released as a stable version: the ladder walks past it.
+
+The major stays `0` regardless: the ecosystem rule ties an integration's major to the
+Core it bundles, and Core is still `0.x`.
+
 ## Commit conventions
 
-Short, imperative subjects, optionally scoped:
+One imperative sentence that says **what changed and why it is better**, then a
+blank line, then a body that answers why. `tools/hooks/commit-msg` enforces
+this — install it with `git config core.hooksPath tools/hooks`, and CI runs the
+same file against every commit a pull request adds.
 
 ```
-fix(cli): exit quietly when the downstream pipe closes early
-feat: add a copy button to the block toolbar
-chore: sync Core snapshot (token fallback chain)
-docs: correct the language-family count
+✗  fix(cli): exit quietly when the downstream pipe closes early
+✗  chore: sync Core snapshot
+✗  0.0.1-beta.3
+✗  Release 0.0.2-beta.2
+
+✓  Exit quietly when the downstream pipe closes early
+✓  Bundle Core 0.0.2-beta.3 so the CLI renders what the site does
 ```
+
+**No type prefixes.** `feat:`, `fix:`, `chore:` classify a commit instead of
+describing it. **No bare version numbers**, with or without a word in front: a
+version names the release without saying anything about it, and it lands on
+every file the release touched.
+
+**One concern per commit, and a version bump is a concern of its own.** The
+subject is printed beside every file the commit touched, so a commit carrying
+four unrelated changes prints a sentence that is a quarter true of each of
+them. A merged subject cannot be reworded afterwards.
+
+**Keep the subject under about 60 characters** — GitHub's file listing
+truncates there.
 
 ## Pull requests
 
 - One PR per concern, to keep reviews easy.
-- Behavior changes must come with added or updated tests — CI runs the suite on Node 18, 20, and 22, and a PR cannot merge red.
+- Behavior changes must come with added or updated tests — CI runs the suite on Node 20, 22, and 24, and a PR cannot merge red.
 - Passing CI is necessary but not sufficient: every PR also needs maintainer review before it merges.
 
 ## Code of Conduct

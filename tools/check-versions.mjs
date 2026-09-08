@@ -59,6 +59,23 @@ const includes = (path, needle, label = needle) =>
 includes('README.md', 'bundles a snapshot', 'the Core snapshot boundary statement');
 includes('README.zh-CN.md', '内置 Core 的快照', 'the Core snapshot boundary statement');
 
+// The badges state this package's version and the Core it bundles, and nothing
+// was checking either: the Core badge sat a whole version line behind the
+// bundle — 0.0.1-beta.1 beside a vendored 0.0.2-beta.1 — on the first thing
+// anyone sees. The other two integrations assert both; this copy did not, and
+// the repository went public that way. shields.io escapes a hyphen as `--`,
+// which is why the badge form is derived rather than compared raw.
+const engineMajor = (pkg.engines?.node || '').replace(/[^\d]/g, '');
+const badgeVersion = version.replace(/-/g, '--');
+const badgeCore = release.bundledCore.version.replace(/-/g, '--');
+for (const doc of ['README.md', 'README.zh-CN.md']) {
+  includes(doc, `version-${badgeVersion}-`, `a version badge reading ${version}`);
+  includes(doc, `JSRay%20Core-${badgeCore}-`, `a Core badge reading ${release.bundledCore.version}`);
+  // The Node badge is a claim about what this will run on, and it was two
+  // majors adrift of engines.node — a reader on 18 would have believed it.
+  includes(doc, `node-%E2%89%A5%20${engineMajor}-`, `a Node badge reading >= ${engineMajor}`);
+}
+
 // The phase wording drifts in whichever direction nobody is looking. jsray-wp
 // shipped a public beta calling itself internal for weeks; this repository did
 // the reverse — version.json claimed a public beta while the repository was

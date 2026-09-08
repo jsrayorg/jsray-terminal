@@ -22,7 +22,7 @@
     "check:versions": "node tools/check-versions.mjs",
     "test": "node --test tests/*.mjs",
     "check:core": "node tools/check-core-freshness.mjs",
-    "test:packaged": "node tests/packaged.mjs"
+    "test:packaged": "node tools/check-core-freshness.mjs --strict && node tests/packaged.mjs"
   },
   "keywords": [
     "jsray",
