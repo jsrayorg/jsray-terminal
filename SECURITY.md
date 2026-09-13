@@ -29,6 +29,7 @@ Out of scope:
 
 | Version | Security updates |
 |---|---|
-| 0.0.1-beta | ✅ Current public beta |
+| 0.0.2-beta | ✅ Current public beta |
+| 0.0.1-beta | ❌ Superseded — upgrade to the current beta |
 | 0.0.1-internal.∗ | ❌ Superseded by the public beta |
 | Stable | Not yet released |

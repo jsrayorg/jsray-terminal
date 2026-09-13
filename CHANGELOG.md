@@ -9,6 +9,37 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.0.2-beta] — 2026-09-13
+
+Bundles JSRay Core 0.0.2-beta.5, the last beta of Core's 0.0.2 line. Still
+installed from GitHub; npm follows at `0.1.0`.
+
+### Changed
+- **Bundled Core is 0.0.2-beta.5**, up from 0.0.2-beta.1. In a terminal:
+  - A comment holding two quotes stays one comment, and a string holding `//`,
+    `#` or `/* */` stays one string, in every grammar. 27 grammars used to cut
+    a comment such as `// don't stop, won't stop` at its first apostrophe.
+  - Heredocs in PHP, shell and Ruby, Ruby's `%w[]` family, Perl's `q{}` family
+    and Elixir sigils render as literals instead of as code.
+  - A JavaScript template nested inside a placeholder no longer ends the outer
+    one early, and private class members such as `#count` are coloured.
+- **Core drift is reported, not failed on.** CI warns while the bundled Core is
+  behind the published one and stays green; the strict check lives in
+  `npm run test:packaged`, because an integration syncs Core when it releases,
+  not when Core does.
+- The sync workflow retires what a newer Core makes obsolete — its own issues
+  and `core/*` branches — instead of leaving one of each per Core release.
+- The README says how to install the CLI rather than how to build it, and its
+  Core badge is derived from `version.json` and checked beside the version
+  badge.
+
+### Fixed
+- Both READMEs called this an internal test build with no public beta after the
+  repository went public, because `publicBetaReleased` in `version.json` was
+  never moved — and the check meant to catch that enforces whatever the flag
+  says, so it stayed green.
+- Commit subjects are checked on pull requests as well as by the local hook.
+
 ## [0.0.1-beta] — 2026-09-05
 
 First public release, source on GitHub and installable from it:
