@@ -10,7 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.0.1--beta-lightgrey)](CHANGELOG.md)
 [![Channel](https://img.shields.io/badge/channel-beta-blue)](CHANGELOG.md)
-[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.2--beta.1-success)](https://github.com/jsrayorg/jsray)
+[![Core](https://img.shields.io/badge/JSRay%20Core-0.0.2--beta.5-success)](https://github.com/jsrayorg/jsray)
 [![Node](https://img.shields.io/badge/node-%E2%89%A5%2020-339933)](package.json)
 
 > 面向终端的 JSRay 代码渲染 · ANSI 真彩 · 35 个语言族 · 零依赖
@@ -97,7 +97,7 @@ CLI 直接运行磁盘上的内置引擎 —— 也就是说,真正渲染你代�
 
 ```sh
 jsray --verify-core
-# official build verified — JSRay Core 0.0.1-beta.2, 6 files
+# official build verified — JSRay Core 0.0.2-beta.5, 6 files
 ```
 
 不匹配时警告走 **stderr** 并照常渲染,绝不污染管道;`--verify-core` 会以非零码退出,便于写进脚本。
