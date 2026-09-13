@@ -19,6 +19,10 @@ on:
 permissions:
   contents: write
   issues: write
+  # Read-only, to see whether a sync branch has a pull request open before the
+  # retirement step below deletes it. Declaring permissions at all sets every
+  # unlisted scope to none.
+  pull-requests: read
 
 jobs:
   sync:
@@ -113,3 +117,58 @@ jobs:
           **Merging this does not ship the fix.** This CLI still has to be released to npm — start that as soon as this lands if the Core release fixed a vulnerability.
 
           [Core changelog](https://github.com/jsrayorg/jsray/blob/main/CHANGELOG.md)"
+
+      # Every Core release used to leave one more issue and one more `core/*`
+      # branch behind, because nothing retired the previous ones: two releases
+      # in, this repository carried an issue and a branch per version, and only
+      # the newest meant anything. So every run retires whatever the current
+      # state has made obsolete — everything but the published version while
+      # the bundle is stale, and everything once it is current. The second case
+      # is how the issues close when a release bundles Core, rather than only
+      # when this workflow happens to sync it first.
+      #
+      # Two things are never touched. If the registry did not answer, nothing
+      # is known about what is obsolete, so nothing is retired. And a branch
+      # with a pull request open from it stays: closing somebody's review is
+      # not this workflow's decision.
+      - name: Retire superseded sync issues and branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STALE: ${{ steps.check.outputs.stale }}
+          PUBLISHED: ${{ steps.check.outputs.published }}
+          BUNDLED: ${{ steps.check.outputs.bundled }}
+        run: |
+          set -e
+          if [ -z "$PUBLISHED" ]; then
+            echo "registry did not answer — retiring nothing"
+            exit 0
+          fi
+          keep=""
+          if [ "$STALE" = "true" ]; then keep="$PUBLISHED"; fi
+
+          gh issue list --state open --search 'in:title "Bundle JSRay Core"' \
+            --json number,title --jq '.[] | "\(.number)\t\(.title)"' |
+          while IFS="$(printf '\t')" read -r number title; do
+            version="${title#Bundle JSRay Core }"
+            if [ "$version" = "$title" ]; then continue; fi
+            if [ -n "$keep" ] && [ "$version" = "$keep" ]; then continue; fi
+            if [ -n "$keep" ]; then
+              note="Superseded: the published beta is now \`$keep\`."
+            else
+              note="Resolved: the bundled Core is \`$BUNDLED\`, the published beta."
+            fi
+            gh issue close "$number" --comment "$note"
+          done
+
+          git ls-remote --heads origin 'refs/heads/core/*' | awk '{print $2}' |
+          sed 's#^refs/heads/##' |
+          while read -r branch; do
+            version="${branch#core/}"
+            if [ -n "$keep" ] && [ "$version" = "$keep" ]; then continue; fi
+            open=$(gh pr list --head "$branch" --state open --json number --jq length)
+            if [ "$open" = "0" ]; then
+              git push origin --delete "$branch"
+            else
+              echo "$branch has an open pull request — left in place"
+            fi
+          done
